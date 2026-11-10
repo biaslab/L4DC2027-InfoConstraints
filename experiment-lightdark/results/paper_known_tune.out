@@ -1,0 +1,13 @@
+paper_known_tuning: 600 episodes in 27 s
+/home/synd/Wouter/Onderzoek/Projecten/tue/bethe-agents/ECC2027-CBFE4ARX/experiment-lightdark/results/paper_known_tuning.pkl
+known: held-out seeds, mean RMSE per goal
+goal                  loose   tight
+label                              
+dual MPC, rho = 1    0.2615  0.2636
+dual MPC, rho = 10   0.1663  0.2636
+dual MPC, rho = 100  1.2441  0.1714
+dual MPC, rho = 3    0.2615  0.2636
+dual MPC, rho = 30   0.3885  0.2636
+dual MPC, rho = 300  1.3216  0.3932
+tuned: shared dual MPC, rho = 10; per goal {'tight': 'dual MPC, rho = 100', 'loose': 'dual MPC, rho = 10'}
+

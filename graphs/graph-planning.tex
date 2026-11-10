@@ -1,0 +1,80 @@
+\begin{tikzpicture}[every node/.style={font=\small}]
+
+    %==========================================================
+    % Generic planning model, unrolled over tau = (t+1, ..., t+K).
+    %   state belief      : f_t     = p(x_t | D_t)
+    %   parameter belief  : f_theta = p(theta | D_t)
+    %   transition        : f_x     = p(x_k | x_{k-1}, u_k, theta)
+    %   emission          : f_y     = p(y_k | x_k)
+    %   control prior     : f_u     = p(u_k)
+    %   goal prior        : f_*     = p_*(y_k)
+    % Equality nodes share theta over the transitions and x_k between
+    % the emission and the next transition. All branches are vertical.
+    %==========================================================
+
+    % ---- parameter chain (top) --------------------------------
+    \node [style=stochastic]    (fth) at (0.0, 2.2) {$f_\theta$};
+    \node [style=deterministic] (th1) at (1.2, 2.2) {$=$};
+    \node [style=deterministic] (th2) at (4.2, 2.2) {$=$};
+    \coordinate                 (th3) at (7.7, 2.2);
+
+    % ---- control priors ----------------------------------------
+    \node [style=stochastic] (fu1) at (1.8, 1.2) {$f_u$};
+    \node [style=stochastic] (fu2) at (4.8, 1.2) {$f_u$};
+    \node [style=stochastic] (fu3) at (8.3, 1.2) {$f_u$};
+
+    % ---- state chain ------------------------------------------
+    \node [style=stochastic]                                        (ft)  at (0.0, 0) {$f_t$};
+    \node [draw, rectangle, minimum width=7mm, minimum height=6mm]  (fx1) at (1.5, 0) {$f_x$};
+    \node [style=deterministic]                                     (eq1) at (3.0, 0) {$=$};
+    \node [draw, rectangle, minimum width=7mm, minimum height=6mm]  (fx2) at (4.5, 0) {$f_x$};
+    \node [style=deterministic]                                     (eq2) at (6.0, 0) {$=$};
+    \node [draw, rectangle, minimum width=7mm, minimum height=6mm]  (fx3) at (8.0, 0) {$f_x$};
+    \coordinate                                                      (xT)  at (9.4, 0);
+
+    % ---- emissions and goal priors -----------------------------
+    \node [draw, rectangle, minimum width=6mm, minimum height=6mm] (fy1) at (3.0, -1.2) {$f_y$};
+    \node [draw, rectangle, minimum width=6mm, minimum height=6mm] (fy2) at (6.0, -1.2) {$f_y$};
+    \node [draw, rectangle, minimum width=6mm, minimum height=6mm] (fy3) at (9.4, -1.2) {$f_y$};
+    \node [style=stochastic] (g1) at (3.0, -2.4) {$f_*$};
+    \node [style=stochastic] (g2) at (6.0, -2.4) {$f_*$};
+    \node [style=stochastic] (g3) at (9.4, -2.4) {$f_*$};
+
+    %==========================================================
+    % Edges
+    %==========================================================
+    % parameter chain and branches into the transitions
+    \draw (fth) -- (th1) -- (th2) -- (6.6, 2.2);
+    \node at (6.95, 2.2) {$\cdots$};
+    \draw (7.3, 2.2) -- (th3);
+    \draw (th1) -- (th1 |- fx1.north);
+    \draw (th2) -- (th2 |- fx2.north);
+    \draw (th3) -- (th3 |- fx3.north);
+    \node [style=edgelabel, above] at ($(fth)!0.5!(th1)$) {$\theta$};
+
+    % control branches into the transitions
+    \draw (fu1) -- (fu1 |- fx1.north);
+    \draw (fu2) -- (fu2 |- fx2.north);
+    \draw (fu3) -- (fu3 |- fx3.north);
+    \node [style=edgelabel, right=0.5mm] at ($(fu1.south)!0.5!(fu1 |- fx1.north)$) {$u_{t+1}$};
+    \node [style=edgelabel, right=0.5mm] at ($(fu2.south)!0.5!(fu2 |- fx2.north)$) {$u_{t+2}$};
+    \node [style=edgelabel, right=0.5mm] at ($(fu3.south)!0.5!(fu3 |- fx3.north)$) {$u_{t+K}$};
+
+    % state chain
+    \draw (ft) -- (fx1) -- (eq1) -- (fx2) -- (eq2) -- (6.7, 0);
+    \node at (7.05, 0) {$\cdots$};
+    \draw (7.4, 0) -- (fx3) -- (xT) -- (fy3);
+    \node [style=edgelabel, above] at ($(ft)!0.5!(fx1)$)   {$x_t$};
+    \node [style=edgelabel, above] at ($(fx1)!0.5!(eq1)$)  {$x_{t+1}$};
+    \node [style=edgelabel, above] at ($(fx2)!0.5!(eq2)$)  {$x_{t+2}$};
+    \node [style=edgelabel, above] at ($(fx3)!0.5!(xT)$)   {$x_{t+K}$};
+
+    % emission and goal branches
+    \draw (eq1) -- (fy1) -- (g1);
+    \draw (eq2) -- (fy2) -- (g2);
+    \draw (fy3) -- (g3);
+    \node [style=edgelabel, right=0.5mm] at ($(fy1)!0.5!(g1)$) {$y_{t+1}$};
+    \node [style=edgelabel, right=0.5mm] at ($(fy2)!0.5!(g2)$) {$y_{t+2}$};
+    \node [style=edgelabel, left=0.5mm]  at ($(fy3)!0.5!(g3)$) {$y_{t+K}$};
+
+\end{tikzpicture}

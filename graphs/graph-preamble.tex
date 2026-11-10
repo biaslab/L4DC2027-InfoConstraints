@@ -1,0 +1,484 @@
+\usepackage{pgfplots}
+\usepackage{circuitikz}
+\usepackage{tikz-cd}
+% \usetikzlibrary{circuits.ee.IEC}
+\usetikzlibrary{intersections}
+\usepackage{bm}
+\usetikzlibrary{positioning}
+\usepgfplotslibrary{fillbetween}
+\pgfplotsset{compat=1.5}
+\usetikzlibrary{pgfplots.groupplots}
+\usetikzlibrary{shapes.geometric,backgrounds}
+\newcommand*\circled[2]{\tikz[baseline=(char.base)]{
+\node[circle,draw,scale=#2,inner sep=2pt] (char) {#1};}}
+\newcommand*\darkcircled[2]{\tikz[baseline=(char.base)]{
+\node[circle,draw,scale=#2,inner sep=2pt,fill=darkgrey, text=white] (char) {#1};}}
+
+% \newcommand\esymbol[1]{\tikz[circuit ee IEC] \draw node [#1,anchor=west,name=s] {};}
+\ctikzset{bipoles/length=.6cm}
+\newcommand\esymbol[1]{\begin{circuitikz}
+\draw (0,0) to [#1] (.1,0); \end{circuitikz}}
+
+\usepackage{tikz}
+\usepackage{xifthen}
+
+\pgfdeclarelayer{bg}    % declare background layer
+\pgfsetlayers{bg,main}  % set the order of the layers (main is the standard layer)
+\definecolor{beige}{RGB}{245, 245, 220}
+
+            
+
+\definecolor{darkgrey}{RGB}{75, 75, 75}
+\definecolor{lightgrey}{RGB}{250, 250, 250}
+% \newcommand*\circled[1]{\tikz[baseline=(char.base)]{            \node[shape=circle,draw,inner sep=1pt] (char) {#1};}}
+\newcommand*\smallcircled[1]{\tikz[baseline=(char.base)]{
+            \node[shape=circle,draw,inner sep=0pt,minimum width=3.5mm] (char) {#1};}}
+
+\newcommand*\blacksmallcircled[1]{\tikz[baseline=(char.base)]{
+            \node[shape=circle,fill=darkgrey, text=white, draw,inner sep=0pt,minimum width=3.5mm] (char) {#1};}}
+            
+\newcommand*\redsmallcircled[1]{\tikz[baseline=(char.base)]{
+            \node[shape=circle, draw=red, text=red,draw,inner sep=0pt,minimum width=3.5mm] (char) {#1};}}
+            
+\newcommand*\reddarksmallcircled[1]{\tikz[baseline=(char.base)]{
+           \node[shape=circle, draw=red, text=white,,fill=red, draw,inner sep=0pt,minimum width=3.5mm] (char) {#1};}}
+
+
+
+
+\usetikzlibrary{calc, arrows, fit, positioning, patterns, decorations.pathreplacing, shapes}
+\tikzstyle{dash} = [dashed, -latex,>=latex]
+\tikzstyle{line} = [draw, -latex,>=latex]
+\tikzstyle{smallbox} = [draw, minimum size=5.0mm]
+\tikzstyle{box} = [draw, minimum size=7.0mm]
+\tikzstyle{bigbox} = [draw, minimum size=10.0mm]
+\tikzstyle{rectangle} = [draw, minimum width=10.0mm, minimum height=20.0mm]
+\tikzstyle{switch} = [trapezium, trapezium angle=120, draw, rotate=90,  inner ysep=5pt, outer sep=5pt,
+minimum height=7mm, minimum width=7mm]
+\tikzstyle{roundbox} = [draw, circle, inner sep=0pt, minimum size=3mm]
+\tikzstyle{clamped} = [draw, fill=darkgrey, minimum size=0.15cm]
+\tikzstyle{msgcircle} = [shape=circle, draw, inner sep=0pt, minimum size=4mm, fill=white, font=\scriptsize]
+\tikzstyle{darkmsgcircle} = [shape=circle, draw, inner sep=0pt, minimum size=4mm, fill=darkgrey, text=white, font=\scriptsize]
+\tikzstyle{redmsgcircle} = [shape=circle, draw=red, inner sep=0pt, minimum size=4mm, text=red, font=\scriptsize]
+\tikzstyle{reddarkmsgcircle} = [shape=circle, draw=red, inner sep=0pt, minimum size=4mm, fill=red, text=white, font=\scriptsize]
+\tikzstyle{msgdoublecircle} = [shape=circle, double, double distance=1.5pt, draw, inner sep=0pt, minimum size=5mm, fill=white]
+\tikzstyle{darkmsgdoublecircle} = [shape=circle, double, double distance=1.5pt, draw, inner sep=0pt, minimum size=5mm, fill=darkgrey, text=white, font=\bfseries]
+% \tikzstyle{rectangle} = [shape=rectangle, draw, minimum size=20mm]
+
+% \draw (0,0) rectangle (4,4);
+% Plate notation argument order: x-left, x-right, y-top, y-bottom
+\newcommand{\brackets}[4]{
+      \draw[dotted, rounded corners=0.3cm, line width = 1pt] ($({#1},{#3})+(-0.3,0)$) -- ($({#1},{#3})+(-0.3,0.3)$) -- ($({#2},{#3})+(0.3,0.3)$) -- ($({#2},{#3})+(0.3,0)$);
+      \draw[dotted, rounded corners=0.3cm, line width = 1pt] ($({#1},{#4})+(-0.3,0)$) -- ($({#1},{#4})+(-0.3,-0.3)$) -- ($({#2},{#4})+(0.3,-0.3)$) -- ($({#2},{#4})+(0.3,0)$);}
+
+% Message notation argument order:
+%     Circle position relative to arrow [up, down, left, right];
+%     Arrow direction [up, down, left, right];
+%     Start node coordinate;
+%     End node coordinate
+%     Position along edge;
+%     Message text;
+\newcommand{\msg}[6]{
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[xshift=-6.0mm] at (anchor) {#6};
+            \node[xshift=-1.0mm] at (anchor) {$\downarrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[xshift=6.0mm] at (anchor) {#6};
+            \node[xshift=1.0mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % Circle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[ yshift=-4.0mm] at (anchor) {#6};
+            \node[yshift=-1.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % Circle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[ yshift=4.0mm] at (anchor) {#6};
+            \node[yshift=1.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % Circle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[ yshift=-4.0mm] at (anchor) {#6};
+            \node[yshift=-1.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % Circle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[ yshift=4.0mm] at (anchor) {#6};
+            \node[yshift=1.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[ xshift=-6.0mm] at (anchor) {#6};
+            \node[xshift=-1.0mm] at (anchor) {$\uparrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[ xshift=6.0mm] at (anchor) {#6};
+            \node[xshift=1.0mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+\newcommand{\msgcircle}[6]{
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle,xshift=-5.0mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\downarrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle,xshift=5.0mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % Circle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % Circle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % Circle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % Circle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle, xshift=-5.0mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\uparrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgcircle, xshift=5.0mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+\newcommand{\darkmsg}[6]{
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, xshift=-5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\downarrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, xshift=5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % Circle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % Circle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % Circle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % Circle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, xshift=-5.0mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\uparrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgcircle, xshift=5.0mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+\newcommand{\redbackmsg}[6]{
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, xshift=-5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\downarrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, xshift=5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % Circle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % Circle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % Circle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % Circle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, xshift=-5.0mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\uparrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[reddarkmsgcircle, xshift=5.0mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+\newcommand{\redmsg}[6]{
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, xshift=-5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\downarrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, xshift=5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % Circle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % Circle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % Circle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, yshift=-5.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % Circle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, yshift=5.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % Circle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, xshift=-5.0mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\uparrow$};
+      }{}
+      % Circle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[redmsgcircle, xshift=5.0mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+\newcommand{\bwmsg}[6]{
+      % doublecircle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, xshift=-5.5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\downarrow$};
+      }{}
+      % doublecircle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, xshift=5.5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % doublecircle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, yshift=-6.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % doublecircle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, yshift=6.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % doublecircle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, yshift=-6.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % doublecircle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, yshift=6.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % doublecircle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, xshift=-5.5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\uparrow$};
+      }{}
+      % doublecircle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[msgdoublecircle, xshift=5.5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+% Dark messages
+\newcommand{\bwdarkmsg}[6]{
+      % doublecircle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, xshift=-5.5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\downarrow$};
+      }{}
+      % doublecircle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{down}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, xshift=5.5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\downarrow$};
+      }{}
+
+      % doublecircle down arrow right
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, yshift=-6.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+      % doublecircle up arrow right
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{right}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, yshift=6.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\rightarrow$};
+      }{}
+
+      % doublecircle down arrow left
+      \ifthenelse{\isin{#1}{down} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, yshift=-6.0mm] at (anchor) {#6};
+            \node[yshift=-2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+      % doublecircle up arrow left
+      \ifthenelse{\isin{#1}{up} \AND \isin{#2}{left}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, yshift=6.0mm] at (anchor) {#6};
+            \node[yshift=2.0mm] at (anchor) {$\leftarrow$};
+      }{}
+
+      % doublecircle left arrow down
+      \ifthenelse{\isin{#1}{left} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, xshift=-5.5mm] at (anchor) {#6};
+            \node[xshift=-1.5mm] at (anchor) {$\uparrow$};
+      }{}
+      % doublecircle right arrow down
+      \ifthenelse{\isin{#1}{right} \AND \isin{#2}{up}}{
+            \coordinate (anchor) at ($({#3})!{#5}!({#4})$);
+            \node[darkmsgdoublecircle, xshift=5.5mm] at (anchor) {#6};
+            \node[xshift=1.5mm] at (anchor) {$\uparrow$};
+      }{}
+}
+
+% nodes style 
+\tikzset{mainstyle/.style={fill=white, draw=black, shape=rectangle, align=center}}
+
+\tikzset{dstyle/.style={mainstyle, minimum size=4mm, inner sep=0pt, text width=4mm}}
+
+\tikzset{sstyle/.style={mainstyle, minimum size=5mm, inner sep=0pt, text width=5mm}}
+
+\tikzset{ostyle/.style={fill=darkgrey, draw=black, shape=rectangle, minimum size=0.2cm, inner sep=0pt, text width=2mm}}
+
+% main nodes
+\tikzstyle{observation}=[ostyle]
+\tikzstyle{deterministic}=[dstyle]
+\tikzstyle{stochastic}=[sstyle]
+
+% auxiliary nodes
+\tikzstyle{filter}=[mainstyle, minimum width=1cm, minimum height=0.5cm]
+\tikzstyle{selector}=[fill=white, draw=black, shape=trapezium, rotate=180, minimum width=1cm, minimum height=0.5cm]
+
+% \newcommand*\circled[1]{\tikz[baseline=(char.base)]{
+%             \node[shape=circle,draw,minimum size=4mm,inner sep=0pt] (char) {#1};}}
+% \newcommand*\squared[1]{\tikz[baseline=(char.base)]{
+%             \node[shape=rectangle,draw,minimum size=5mm,inner sep=0pt] (char) {#1};}}
+% Line weight of all graphs: edges, node borders, dashed boxes and message
+% circles are drawn semithick (0.6 pt) instead of TikZ's default thin (0.4 pt).
+\tikzset{every picture/.append style={semithick}}

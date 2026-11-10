@@ -1,0 +1,13 @@
+paper_directional_tuning: 360 episodes in 716 s
+/home/synd/Wouter/Onderzoek/Projecten/tue/bethe-agents/ECC2027-CBFE4ARX/experiment-lightdark/results/paper_directional_tuning.pkl
+directional: held-out seeds, mean RMSE per goal
+goal                  loose   tight
+label                              
+dual MPC, rho = 1    0.2970  0.2978
+dual MPC, rho = 10   0.2361  0.2978
+dual MPC, rho = 100  1.2602  0.2386
+dual MPC, rho = 3    0.2970  0.2978
+dual MPC, rho = 30   0.3807  0.2978
+dual MPC, rho = 300  1.3609  0.4162
+tuned: shared dual MPC, rho = 10; per goal {'tight': 'dual MPC, rho = 100', 'loose': 'dual MPC, rho = 10'}
+

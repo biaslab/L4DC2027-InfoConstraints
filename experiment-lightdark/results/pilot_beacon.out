@@ -1,0 +1,18 @@
+/home/synd/Wouter/Onderzoek/Projecten/tue/bethe-agents/ECC2027-CBFE4ARX/agents/cbfe_lightdark/agent.py:117: RuntimeWarning: invalid value encountered in divide
+  self.p = posterior / posterior.sum()
+/home/synd/Wouter/Onderzoek/Projecten/tue/bethe-agents/ECC2027-CBFE4ARX/agents/cbfe_lightdark/agent.py:117: RuntimeWarning: invalid value encountered in divide
+  self.p = posterior / posterior.sum()
+2000 episodes in 160 s
+                     active         final        final_P         inside            nll        parameter_active         rmse        trips      
+goal                  loose  tight  loose  tight   loose  tight   loose   tight  loose  tight            loose tight  loose  tight loose tight
+label                                                                                                                                         
+CBFE                    0.0  0.000  0.206  0.080   0.023  0.002  97.750  93.183  0.362  7.314            0.233   1.7  0.245  0.381  0.16  1.00
+CBFE, state only        0.0  0.033  0.210  0.239   0.024  0.028  97.900  33.867  0.369  4.512            0.000   0.0  0.246  0.277  0.13  0.10
+CBFE, parameter only    0.0  0.000  0.206  0.080   0.023  0.002  97.750  93.183  0.362  7.314            0.233   1.7  0.245  0.381  0.16  1.00
+cautious                0.0  0.000  0.210  0.231   0.024  0.028  97.900  33.883  0.369  4.495            0.000   0.0  0.246  0.276  0.13  0.08
+BSP                     0.0  0.000  0.153  0.163   0.020  0.021  97.133  67.367  0.288  3.164            0.000   0.0  0.217  0.223  0.56  0.58
+dual 3                  0.0  0.000  0.209  0.231   0.024  0.028  97.867  33.867  0.365  4.495            0.000   0.0  0.245  0.276  0.13  0.08
+dual 10                 0.0  0.000  0.200  0.231   0.021  0.028  96.883  33.833  0.454  4.495            0.000   0.0  0.271  0.276  0.86  0.08
+dual 30                 0.0  0.000  0.224  0.233   0.003  0.028  87.850  32.383  1.031  4.519            0.000   0.0  0.446  0.277  4.56  0.09
+dual 100                0.0  0.000  1.237  0.206   0.001  0.021   0.900  50.550  8.068  4.401            0.000   0.0  1.270  0.272  1.49  0.87
+oracle                  0.0  0.000  0.008  0.008   0.000  0.000  99.383  98.267  0.036  0.361            0.000   0.0  0.072  0.072  0.08  0.08

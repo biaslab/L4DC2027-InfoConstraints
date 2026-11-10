@@ -1,0 +1,32 @@
+\begin{tikzpicture}[every node/.style={font=\small}]
+
+    %==========================================================
+    % Generic FFG fragment at a control edge u_t, drawn horizontally.
+    % The control prior f_u sends message 1 along the control edge,
+    % the consuming node f_a sends message 2 back, and the two meet
+    % above the edge. Message 2 collects the beliefs on the other
+    % input edges (s_1, s_2) and the backward message on the output
+    % edge (s_3), which all leave f_a on its right side. The product
+    % of messages 1 and 2 is the control belief q(u_t).
+    %==========================================================
+
+    \node [style=stochastic] (fu) at (0, 0) {$f_u$};
+    \node [draw, rectangle, minimum width=8mm, minimum height=12mm] (fa) at (2.3, 0) {$f_a$};
+
+    % control edge with the two messages that meet above it
+    \draw (fu) -- (fa.west);
+    \node [style=edgelabel, below=0.6mm] at ($(fu.east)!0.5!(fa.west)$) {$u_{t+1}$};
+    \foreach \pos/\arrow/\m in {0.3/\rightarrow/1, 0.7/\leftarrow/2} {
+        \coordinate (anchor) at ($(fu.east)!\pos!(fa.west)$);
+        \node [yshift=1.5mm, inner sep=0pt] at (anchor) {$\arrow$};
+        \node [msgcircle, yshift=5.3mm] at (anchor) {\m};
+    }
+
+    % other edges of f_a, all on its right side, with their incoming messages
+    \foreach \y/\s/\m in {0.4/x_{t+1}/q(s_1), 0/x_{t}/q(s_2), -0.4/\theta/q(s_3)} {
+        \draw ($(fa.east)+(0,\y)$) -- ($(fa.east)+(1.9,\y)$);
+        \node [style=edgelabel, above] at ($(fa.east)+(0.45,\y)$) {$\s$};
+        \node [font=\scriptsize, anchor=west, inner sep=1pt] at ($(fa.east)+(1.95,\y)$) {};
+    }
+
+\end{tikzpicture}

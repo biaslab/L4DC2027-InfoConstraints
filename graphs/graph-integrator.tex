@@ -1,0 +1,40 @@
+\begin{tikzpicture}[every node/.style={font=\small}]
+
+    %==========================================================
+    % One slice of the integrator with unknown gain,
+    %   x_k = x_{k-1} + b u_k + w_k,  w_k ~ N(0, sigma^2),  y_k = x_k.
+    % The transition f_x is the composite of a multiplication node,
+    % an addition node and the noise node.
+    %==========================================================
+
+    % parameter chain (gain b)
+    \node [style=deterministic] (eqb) at (0, 2.0) {$=$};
+    \draw (-1.7, 2.0) -- (eqb) -- (2.1, 2.0);
+    \node [style=edgelabel, above] at (-1.0, 2.0) {$b$};
+
+    % transition: x_k = x_{k-1} + b u_k + w_k
+    \node [style=deterministic] (mul) at (0, 1.0) {$\times$};
+    \node [style=deterministic] (add) at (0, 0)   {$+$};
+    \node [style=stochastic]    (fw)  at (0, -1.15) {$\mathcal{N}$};
+    \node [style=stochastic]    (fu)  at (1.4, 1.0) {$f_u$};
+    \draw (eqb) -- (mul);
+    \draw (fu) -- (mul);
+    \draw (mul) -- (add);
+    \draw (fw) -- (add);
+    \node [style=edgelabel, above] at ($(fu)!0.5!(mul)$) {$u_k$};
+    \node [style=edgelabel, right=0.5mm] at ($(fw.north)!0.45!(add.south)$) {$w_k$};
+
+    % state chain and goal prior (y_k = x_k)
+    \node [style=deterministic] (eqx) at (1.4, 0)    {$=$};
+    \node [style=stochastic]    (g)   at (1.4, -1.15) {$f_*$};
+    \draw (-1.7, 0) -- (add) -- (eqx) -- (2.1, 0);
+    \draw (eqx) -- (g);
+    \node [style=edgelabel, above] at (-1.0, 0) {$x_{k-1}$};
+    \node [style=edgelabel, above] at ($(add)!0.5!(eqx)$) {$x_k$};
+    \node [style=edgelabel, right=0.5mm] at ($(eqx)!0.5!(g)$) {$y_k$};
+
+    % dashed box around the composite transition node f_x
+    \draw [dashed, rounded corners=2pt] (-0.4, -0.3) rectangle (0.4, 1.35);
+    \node [style=edgelabel] at (-0.7, 0.95) {$f_x$};
+
+\end{tikzpicture}

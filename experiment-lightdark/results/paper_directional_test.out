@@ -1,0 +1,52 @@
+paper_directional_test: 2400 episodes in 4552 s
+/home/synd/Wouter/Onderzoek/Projecten/tue/bethe-agents/ECC2027-CBFE4ARX/experiment-lightdark/results/paper_directional_test.pkl
+directional: held-out seeds, mean RMSE per goal
+goal                  loose   tight
+label                              
+dual MPC, rho = 1    0.2970  0.2978
+dual MPC, rho = 10   0.2361  0.2978
+dual MPC, rho = 100  1.2602  0.2386
+dual MPC, rho = 3    0.2970  0.2978
+dual MPC, rho = 30   0.3807  0.2978
+dual MPC, rho = 300  1.3609  0.4162
+tuned: shared dual MPC, rho = 10; per goal {'tight': 'dual MPC, rho = 100', 'loose': 'dual MPC, rho = 10'}
+
+directional: test seeds, means per goal
+                    gain_variance          inside             nll          rmse        steady        transient         trips      
+goal                        loose  tight    loose    tight  loose  tight  loose  tight  loose  tight     loose   tight loose tight
+label                                                                                                                             
+CBFE                        0.041  0.004   95.067   90.217  0.495  3.946  0.271  0.277  0.453  1.294     0.871  27.816  0.94  2.63
+CBFE, state only            0.046  0.016   94.383   63.711  0.582  3.961  0.284  0.272  0.544  3.153     0.919  11.233  0.77  2.78
+CBFE, gain only             0.075  0.013   87.972   74.617  0.928  4.813  0.349  0.291  0.908  3.327     1.102  18.194  0.12  1.34
+cautious                    0.077  0.077   87.911   37.889  0.928  9.248  0.349  0.349  0.909  9.056     1.099  10.971  0.05  0.05
+BSP                         0.073  0.072   88.839   39.256  0.902  9.051  0.343  0.344  0.884  8.868     1.068  10.694  0.07  0.08
+oracle                      0.000  0.000  100.000  100.000  0.001  0.008  0.011  0.011  0.000  0.005     0.004   0.039  0.00  0.00
+dual MPC, rho = 10          0.024  0.077   96.283   37.889  0.466  9.248  0.278  0.349  0.391  9.056     1.148  10.971  1.22  0.05
+dual MPC, rho = 100         0.001  0.020    0.000   60.228  7.936  3.837  1.260  0.266  7.712  2.729     9.949  13.810  1.08  2.07 
+
+goal tight: paired differences to CBFE, mean [95% interval]
+   CBFE, state only      nll +0.014 [-0.492, +0.550]  transient -16.583 [-18.527, -14.711]  steady +1.859 [+1.381, +2.363]
+   CBFE, gain only       nll +0.867 [-0.090, +2.062]  transient -9.622 [-13.035, -5.990]  steady +2.032 [+1.117, +3.194]
+   cautious              nll +5.301 [+2.454, +8.626]  transient -16.845 [-20.970, -12.127]  steady +7.762 [+4.937, +11.069]
+   BSP                   nll +5.104 [+2.142, +8.461]  transient -17.122 [-21.310, -12.453]  steady +7.574 [+4.643, +11.022]
+   oracle                nll -3.938 [-4.229, -3.676]  transient -27.777 [-29.991, -25.755]  steady -1.289 [-1.524, -1.094]
+   dual MPC, rho = 10    nll +5.302 [+2.381, +8.608]  transient -16.845 [-20.923, -12.140]  steady +7.762 [+4.908, +11.037]
+   dual MPC, rho = 100   nll -0.110 [-0.618, +0.413]  transient -14.007 [-15.938, -12.168]  steady +1.435 [+0.940, +1.951]
+goal loose: paired differences to CBFE, mean [95% interval]
+   CBFE, state only      nll +0.087 [-0.000, +0.240]  transient +0.049 [-0.054, +0.213]  steady +0.092 [+0.003, +0.244]
+   CBFE, gain only       nll +0.433 [+0.200, +0.684]  transient +0.232 [-0.066, +0.592]  steady +0.456 [+0.220, +0.708]
+   cautious              nll +0.433 [+0.201, +0.688]  transient +0.229 [-0.076, +0.587]  steady +0.456 [+0.227, +0.721]
+   BSP                   nll +0.408 [+0.170, +0.674]  transient +0.198 [-0.103, +0.562]  steady +0.431 [+0.192, +0.707]
+   oracle                nll -0.494 [-0.648, -0.359]  transient -0.867 [-1.010, -0.733]  steady -0.452 [-0.615, -0.317]
+   dual MPC, rho = 10    nll -0.028 [-0.178, +0.112]  transient +0.278 [+0.133, +0.409]  steady -0.062 [-0.214, +0.082]
+   dual MPC, rho = 100   nll +7.441 [+7.278, +7.579]  transient +9.079 [+8.859, +9.288]  steady +7.260 [+7.097, +7.398]
+
+test seeds: goal cost of the dual MPC per rho, relative to CBFE
+goal    loose  tight
+rho                 
+1.0     1.876  2.343
+3.0     1.876  2.343
+10.0    0.943  2.343
+30.0    1.593  2.343
+100.0  16.048  0.972
+300.0  49.571  2.269
