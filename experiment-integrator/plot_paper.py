@@ -9,6 +9,9 @@ written to figures/:
                                  is active, per step and prior mean
     fig_integrator_episode.pdf   one episode under the symmetric prior b0 = 0
                                  (main-extended.tex only)
+    fig_integrator_constraint.pdf  episodes in which the information constraint
+                                 of the paper's CBFE is active, per step and
+                                 prior mean (main.tex, Fig. 2a)
     legend_integrator.pdf        the legend of this row in main-extended.tex
 
 The legends of the figures of main.tex come from figures/paper_style.py.
@@ -148,6 +151,28 @@ def plot_activity(results, path) -> None:
     S.save(fig, path)
 
 
+def plot_constraint(results, path, steps: int = 10) -> None:
+    """Panel (a) of the results figure of main.tex: share of the episodes
+    in which the information constraint of CBFE (the controller of the
+    paper) is active, per step and prior mean b0."""
+    from matplotlib.lines import Line2D
+    cbfe = [r for r in results if r["label"] == CBFE]
+    k = np.arange(1, steps + 1)
+    fig, ax = S.row_panel()
+    handles = []
+    for color, b0 in zip(S.BLUE_RAMP, Run.B0):
+        active = np.mean([r["episode"].beta[:steps] > 0 for r in cbfe if r["b0"] == b0], axis=0)
+        style = dict(color=color, marker="o", ms=2.8, mec="white", mew=0.4, lw=1.1)
+        ax.plot(k, 100 * active, **style, zorder=4 - Run.B0.index(b0) / 10)
+        handles.append(Line2D([], [], **style))
+    ax.set(xlim=(0.6, steps + 0.4), ylim=(-4, 104), xticks=[1, 4, 7, 10], yticks=[0, 25, 50, 75, 100])
+    ax.set_xlabel(r"step $t$")
+    ax.set_ylabel("active episodes [%]", labelpad=2)
+    S.top_legend(fig, handles, [r"$b_0 = 0$"] + [f"{b0:g}" for b0 in Run.B0[1:]], handlelength=1.1,
+                 columnspacing=0.6)
+    S.save(fig, path)
+
+
 def example_episode(results):
     """The episode of the integrator notebook: the first seed under b0 = 0
     whose gain has 0.6 < |b| < 1."""
@@ -177,6 +202,7 @@ def main() -> None:
     results = I.load("benchmark")
     plot_rmse(results, FIGURES / "fig_integrator_rmse.pdf")
     plot_sensitivity(results, FIGURES / "fig_integrator_sensitivity.pdf")
+    plot_constraint(results, FIGURES / "fig_integrator_constraint.pdf")
     plot_loss(results, FIGURES / "fig_integrator_loss.pdf")
     plot_activity(results, FIGURES / "fig_integrator_activity.pdf")
     plot_episode(results, FIGURES / "fig_integrator_episode.pdf")

@@ -1,0 +1,112 @@
+\begin{tikzpicture}[every node/.style={font=\small}]
+
+    %==========================================================
+    % FFG of the probabilistic state-space model (eq:probssm) with the
+    % goal priors (eq:goal), unrolled over tau = (t+1, ..., t+K).
+    %   state prior      : f_t     = p(x_t)
+    %   parameter prior  : f_theta = p(theta)
+    %   control prior    : f_u     = p(u_k)
+    %   state transition : f_x     = p(x_k | x_{k-1}, theta, u_k)
+    %   likelihood       : f_y     = p(y_k | x_k)
+    %   goal prior       : f_*     = p_*(y_k)
+    % Equality nodes share theta between the transitions and x_k between
+    % the likelihood and the next transition. The last slice has no
+    % equality nodes, because theta and x_{t+K} have only two factors there.
+    % Messages:
+    %   1, 2 : control prior and transition node on the edge u_{t+1}
+    % and per slice t+1 / t+2 / t+K:
+    %   3 /  9 / 15 : forward state message into f_x (from f_t at t+1)
+    %   4 / 10 / 16 : parameter message into f_x
+    %   5 / 11 / 17 : forward state message on the edge x_k
+    %   6 / 12 / 18 : backward state message on the edge x_k
+    %   7 / 13 / 19 : forward message on the edge y_k, into the goal prior
+    %   8 / 14 / 20 : backward message on the edge y_k, from the goal prior
+    %==========================================================
+
+    \tikzset{transition/.style={draw, rectangle, minimum width=12mm, minimum height=6mm, inner sep=0pt}}
+
+    % ---- rows (y) and offsets (x) within a slice ---------------
+    \def\yth{1.65}   % parameter chain
+    \def\yu{1.1}     % control priors
+    \def\yy{-0.8}    % likelihoods
+    \def\yg{-2.1}    % goal priors
+    \def\dth{-0.45}  % parameter edge, relative to the transition node
+    \def\du{0.4}     % control edge, relative to the transition node
+    \def\dy{2.35}    % output branch, relative to the transition node
+
+    % ---- priors ------------------------------------------------
+    \node [style=stochastic] (fth) at (0, \yth) {$f_\theta$};
+    \node [style=stochastic] (ft)  at (0, 0)    {$f_t$};
+
+    % ---- slices t+1, t+2 and t+K ------------------------------
+    \foreach \i/\X/\k in {1/2.0/t+1, 2/6.3/t+2, 3/11.3/t+K} {
+        \node [style=transition] (fx\i) at (\X, 0)              {$f_x$};
+        \node [style=stochastic] (fu\i) at (\X + \du, \yu)      {$f_u$};
+        \node [style=stochastic] (fy\i) at (\X + \dy, \yy)      {$f_y$};
+        \node [style=stochastic] (g\i)  at (\X + \dy, \yg)      {$f_*$};
+        \coordinate              (th\i) at (\X + \dth, \yth);
+        \coordinate              (x\i)  at (\X + \dy, 0);
+        \draw (th\i) -- (th\i |- fx\i.north);
+        \draw (fu\i) -- (fu\i |- fx\i.north);
+        \draw (x\i) -- (fy\i) -- (g\i);
+        \node [style=edgelabel, right=0.5mm] at (fu\i.east) {$u_{\k}$};
+        \node [style=edgelabel, right=0.5mm] at (g\i.east) {$y_{\k}$};
+    }
+    % ---- parameter chain --------------------------------------
+    \draw (fth) -- (th1) -- (th2) -- ($(th2) + (1.85, 0)$);
+    \node at ($(th2) + (2.2, 0)$) {$\cdots$};
+    \draw ($(th2) + (2.55, 0)$) -- (th3);
+    \node [style=edgelabel, above] at ($(fth.east)!0.5!($(th1) + (-0.2, 0)$)$) {$\theta$};
+
+    % ---- state chain ------------------------------------------
+    \draw (ft) -- (fx1) -- (x1) -- (fx2) -- (x2) -- ($(x2) + (0.5, 0)$);
+    \node at ($(x2) + (0.85, 0)$) {$\cdots$};
+    \draw ($(x2) + (1.2, 0)$) -- (fx3) -- (x3);
+    \node [style=edgelabel, below] at ($(ft.east)!0.5!(fx1.west)$)  {$x_t$};
+    \node [style=edgelabel, below] at ($(fx1.east) + (0.42, 0)$) {$x_{t+1}$};
+    \node [style=edgelabel, below] at ($(fx2.east) + (0.42, 0)$) {$x_{t+2}$};
+    \node [style=edgelabel, below] at ($(fx3.east) + (0.42, 0)$) {$x_{t+K}$};
+
+    % ---- equality nodes, drawn over the chains -----------------
+    \foreach \i in {1, 2} {
+        \node [style=deterministic] at (th\i) {$=$};
+        \node [style=deterministic] at (x\i)  {$=$};
+    }
+
+    % ---- messages 1, 2 on the edge u_{t+1} ---------------------
+    \coordinate (u1) at ($(fu1.south)!0.5!(fu1 |- fx1.north)$);
+    \node [xshift=-1.5mm] at (u1) {$\downarrow$};
+    \node [msgcircle, xshift=-5mm] at (u1) {1};
+    \node [xshift=1.5mm] at (u1) {$\uparrow$};
+    \node [msgcircle, xshift=5mm] at (u1) {2};
+
+    % ---- messages 3-8 (t+1), 9-14 (t+2) and 15-20 (t+K) --------
+    % Per slice: forward state message into f_x, parameter message into
+    % f_x, forward and backward state messages on x_k, and forward and
+    % backward messages on y_k. The later slices are drawn transparent,
+    % because their messages are functionally equivalent to 3-8.
+    \foreach \i/\nx/\nth/\nf/\nb/\ny/\ng/\op in {1/3/4/5/6/7/8/1, 2/9/10/11/12/13/14/0.4, 3/15/16/17/18/19/20/0.4} {
+    \begin{scope}[opacity=\op]
+        \coordinate (mx)  at ($(fx\i.west) + (-0.6, 0)$);
+        \node [yshift=1.5mm] at (mx) {$\rightarrow$};
+        \node [msgcircle, yshift=5.5mm] at (mx) {\nx};
+
+        \coordinate (mth) at ($(th\i |- fx\i.north) + (0, 0.8)$);
+        \node [xshift=-1.5mm] at (mth) {$\downarrow$};
+        \node [msgcircle, xshift=-5mm] at (mth) {\nth};
+
+        \coordinate (mfb) at ($(x\i) + (-0.6, 0)$);
+        \node [yshift=1.5mm] at (mfb) {$\rightarrow$};
+        \node [msgcircle, yshift=5.5mm] at (mfb) {\nf};
+        \node [yshift=-1.5mm] at (mfb) {$\leftarrow$};
+        \node [msgcircle, yshift=-5.5mm] at (mfb) {\nb};
+
+        \coordinate (my)  at ($(fy\i.south)!0.5!(g\i.north)$);
+        \node [xshift=-1.5mm] at (my) {$\downarrow$};
+        \node [msgcircle, xshift=-5mm] at (my) {\ny};
+        \node [xshift=1.5mm] at (my) {$\uparrow$};
+        \node [msgcircle, xshift=5mm] at (my) {\ng};
+    \end{scope}
+    }
+
+\end{tikzpicture}

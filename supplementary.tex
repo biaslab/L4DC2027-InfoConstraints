@@ -1,0 +1,176 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Supplementary material of main.tex, uploaded as a separate file.
+% main.tex inputs this file after the references. It starts on a new page and
+% numbers its sections, equations, figures, tables and theorems S1, S2, ...,
+% so that it is set apart from the appendices of the paper.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\clearpage
+\begin{center}
+	{\Large\bfseries Supplementary Material}
+\end{center}
+
+\setcounter{section}{0}
+\setcounter{equation}{0}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+\setcounter{theorem}{0}
+\def\presectionnum{}
+\renewcommand{\thesection}{S\arabic{section}}
+\renewcommand{\theequation}{S\arabic{equation}}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\renewcommand{\thetheorem}{S\arabic{theorem}}
+\renewcommand{\theHsection}{S\arabic{section}}
+\renewcommand{\theHequation}{S\arabic{equation}}
+\renewcommand{\theHfigure}{S\arabic{figure}}
+\renewcommand{\theHtable}{S\arabic{table}}
+\def\theHtheorem{S\arabic{theorem}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Bethe Collapse}\label{supp:collapse}
+
+\begin{table}[htb]
+	\caption{Contribution of every type of node in Fig.~\ref{fig:ffg} to the Bethe free energy~\eqref{eq:bethe} under the constraints of Lemma~\ref{lem:collapse}. The node $a$ of a transition or measurement has the input edges $\mathrm{in}(a)$, and the equality node passes the belief $q$ of its input edge.}
+	\label{tab:collapse}
+	\centering\small
+	\begin{tabular}{@{}lll@{}}
+		\toprule
+		Node & Belief & Contribution \\
+		\midrule
+		$f_t$, $f_\theta$ & $q = f$ (Definition~\ref{def:form}) & $0$ \\
+		$f_u = p(u_k)$ & $q(u_k)$ & $\KL[q(u_k) \,\|\, p(u_k)]$ \\
+		$f_x$, $f_y$ & $f_a \prod_{i \in \mathrm{in}(a)} q_i$ (Definition~\ref{def:factorization}) & $-\sum_{i \in \mathrm{in}(a)} \mathbb{H}[q_i]$ \\
+		$=$ & $q(s)\, \delta(s - s')\, \delta(s - s'')$ & $-\mathbb{H}[q]$ \\
+		$f_* = p_*(y_k)$ & $q(y_k)$ & $-\mathbb{H}[q(y_k)] - \E_{q(y_k)}[\ln p_*(y_k)]$ \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+\begin{proofof}{Lemma~\ref{lem:collapse}}
+The proof evaluates the node terms of the Bethe free energy~\eqref{eq:bethe} for every type of node in Fig.~\ref{fig:ffg}, and it then cancels their entropies against the edge entropies. We orient every edge along the generative model~\eqref{eq:probssm}, from the node that generates its variable to the node that consumes it. The belief nodes $f_t$ and $f_\theta$ and the control priors $f_u$ then have only outputs, the goal nodes $f_*$ have only an input, and every edge is the input of exactly one node. Table~\ref{tab:collapse} collects the contributions that we derive next.
+
+\emph{Belief nodes.} The form constraints pin $q(x_t) = f_t(x_t)$ and $q(\theta) = f_\theta(\theta)$, so the log-ratios of both nodes vanish, and they contribute zero.
+
+\emph{Control priors.} The node $f_u = p(u_k)$ has the single edge $u_k$, so its belief is the edge belief $q(u_k)$. Its term is therefore the divergence $\KL[q(u_k) \,\|\, p(u_k)]$ of the control belief from its prior.
+
+\emph{Conditional nodes.} A transition or measurement node $a$ has the belief~\eqref{eq:factorization}, so its factor cancels in the log-ratio, $\ln (q_a / f_a) = \sum_{i \in \mathrm{in}(a)} \ln q_i$. The factor $f_a$ is a normalised density of the output given the inputs, so integrating $q_a$ over the output leaves the product of the input beliefs. Hence
+\begin{equation}
+	\int q_a(s_a) \ln \frac{q_a(s_a)}{f_a(s_a)}\, \rmd s_a = \sum_{i \in \mathrm{in}(a)} \int q_i(s_i) \ln q_i(s_i)\, \rmd s_i = -\sum_{i \in \mathrm{in}(a)} \mathbb{H}[q_i] \, .
+\end{equation}
+The transition of step $k$ thus contributes the negative entropies of $q(x_{k-1})$, $q(\theta)$ and $q(u_k)$, and the measurement of step $k$ contributes that of $q(x_k)$. The same integration shows that the marginals of $q_a$ on its input edges equal the edge beliefs, so the node beliefs meet the marginalization constraints~\eqref{eq:local} at their inputs without multipliers, as Section~\ref{sec:cbfe} uses.
+
+\emph{Equality nodes.} An equality node has the factor $\delta(s - s')\, \delta(s - s'')$ on its three edges, and its belief is $q(s)\, \delta(s - s')\, \delta(s - s'')$, where $q$ is the belief of its input edge. The deltas cancel in the log-ratio, so the node contributes $\int q(s) \ln q(s)\, \rmd s = -\mathbb{H}[q]$, the negative entropy of its input.
+
+\emph{Goal nodes.} The node $f_* = p_*(y_k)$ has the single edge $y_k$, so its belief is $q(y_k)$, and it contributes
+\begin{equation}
+	\int q(y_k) \ln \frac{q(y_k)}{p_*(y_k)}\, \rmd y_k = -\mathbb{H}[q(y_k)] - \E_{q(y_k)}\big[\ln p_*(y_k)\big] \, .
+\end{equation}
+
+\emph{Cancellation.} Every edge is the input of exactly one node, and this node is a conditional, equality or goal node, because the belief nodes and the control priors have no inputs. The negative entropies in Table~\ref{tab:collapse} therefore sum to $-\sum_{i \in \mathcal{E}} \mathbb{H}[q_i]$, which cancels the edge entropies of~\eqref{eq:bethe}. For example, the edge $u_k$ leaves $f_u$ and enters the transition of step $k$, which contributes $-\mathbb{H}[q(u_k)]$, and the edge term $+\mathbb{H}[q(u_k)]$ cancels it. Only the divergences of the control priors and the expected goal log-densities of the goal nodes remain, which gives~\eqref{eq:collapse}.
+\end{proofof}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{State-Space Model: Integrator with Unknown Gain}\label{sec:integrator}
+
+The benchmark of \citet{aastrom1986dual} consists of $x_k = x_{k-1} + b\, u_k + w_k$ and $y_k = x_k$ that has to be driven to zero over $T = 50$ steps from $x_0 = 0$.
+The noise is zero-mean Gaussian distributed, $w_k \sim \cN(0, \sigma^2)$, and the gain is unknown, $\theta = b \sim \cN(b_0, 1)$. The input determines how much the next state reveals about the gain, and under $b_0 = 0$ the unknown sign of the gain turns a cautious controller off. The parameter belief is the Kalman filter $\cN(\hat{b}_t, P_t)$, so the gain adds the variance $P_t u^2$ to the prediction, and the information of the transition node is $\tfrac{1}{2}\ln(1 + \ell_t(u))$ with $\ell_t(u) = P_t u^2/\sigma^2$. With the goal prior $\cN(0, \sigma^2)$, the floor is
+\begin{equation}\label{eq:integrator-info}
+	\beta_t = \tfrac{1}{2}\ln\frac{\sigma^2 + P_t\, \E_{\tilde{p}_t}[u^2]}{2\sigma^2} \, .
+\end{equation}
+
+We set $\sigma = 0.1$ and run 200 episodes for each prior mean $b_0 \in \{0, 0.5, 1, 2, 4\}$, with $b$ drawn from its prior. The controllers and the tuning protocol are those of Section~\ref{sec:experiments}, but we report the root-mean-square error (RMSE) of the output, which orders the episodes as their goal cost does. Tuning on 50 held-out episodes per prior mean selects $\rho = 5$ from $\{0, 0.5, 1, 2, 5, 10, 20, 50\}$ and the accuracy 0.1 of MPC-X from $\{0.01, 0.03, 0.1, 0.3, 1\}$. The optimal dual controller follows from dynamic programming on the Bellman equation of {\AA}str{\"o}m and Helmersson on a $121 \times 121$ grid without an input bound, and all other controllers keep $|u_k| \leq 1$.
+
+CBFE comes within 6\% of the RMSE of the dual MPC with the best probing weight for every prior mean, without tuning. Over all prior means, CBFE attains an RMSE of 0.116, against 0.114 for the dual MPC with the tuned $\rho = 5$ and 0.116 for MPC-X. The paired difference to the dual MPC is 0.002 [0.001, 0.004], i.e., 2.1\%, and the difference to MPC-X is 0.001 [$-0.001$, 0.003]. The optimal dual controller attains 0.104, but without an input bound and by minimising the expected sum of squared outputs. Outside $5 \leq \rho \leq 10$, the RMSE of the dual MPC exceeds that of CBFE by at least 7\% (Fig.~\ref{fig:sensitivity-integrator}). For $\rho \leq 2$, it applies no input under $b_0 = 0$, where its RMSE is 0.436, and $\rho = 50$ over-probes and exceeds the RMSE of CBFE over all prior means by 24\%.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=0.4\textwidth]{fig_integrator_constraint}
+	\caption{Share of the 200 integrator episodes per prior mean $b_0$ in which the information constraint of CBFE is active, per step. The constraint acts only in the first steps, and never for $b_0 = 4$.}
+	\label{fig:integrator-activity}
+\end{figure}
+
+Fig.~\ref{fig:integrator-activity} shows that the multiplier probes only while the gain is too uncertain for the goal. Its constraint is active on 2.0\% of the steps, at the first step of every episode for $b_0 \leq 0.5$, at the second step of 75\% of the episodes for $b_0 = 1$, and never for $b_0 = 4$. The active multipliers have a median of 3.2, and twice this median lies inside the window of good probing weights. Without the constraint, the cautious controller applies no input under $b_0 = 0$, because every input only adds predictive spread while the sign of the gain is unknown.
+
+%\emph{Takeaway:} The KKT multiplier turns the cautious controller into a dual controller that comes within 2.1\% of a dual MPC tuned on held-out episodes and switches itself off once the gain is known well enough for the goal.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{ARX Model: Two-Link Arm with Unknown Motor Polarity}\label{supp:arm}
+
+The ARX model predicts the output from the current input and a buffer of past outputs,
+\begin{equation}\label{eq:arx}
+	y_k = A^\top \phi(u_k, y_{k-1}) + e_k \, , \qquad e_k \sim \cN(0, W^{-1}) \, ,
+\end{equation}
+so its state is the output buffer, and $\Theta = (A, W)$ collects the coefficients and the noise precision~\citep{nisslbeck2025factor}. Under a matrix normal--Wishart prior, the posterior $\mathcal{MN}(A \given M_t, \Lambda_t^{-1}, W^{-1})\, \allowbreak \mathcal{W}(W \given \Omega_t, \eta_t)$ follows in closed form~\citep{nisslbeck2025factor,gelman1995bayesian}. Its coefficient precision accumulates the features, and the leverage of a feature vector weighs it against this precision,
+\begin{equation}\label{eq:leverage}
+	\Lambda_k = \Lambda_{k-1} + \phi_k\phi_k^\top \, , \qquad \ell_t(\phi) = \phi^\top \Lambda_t^{-1}\phi \, .
+\end{equation}
+The posterior predictive is a Student-t density with covariance $(1 + \ell_t(\phi))R_t$, where $R_t$ is the posterior mean of the noise covariance.
+
+Given $W$, the coefficients add the covariance $\ell_t W^{-1}$ to the prediction, so their information is $\tfrac{n_y}{2}\ln(1 + \ell_t(\phi))$, whereas the information about $W$ does not depend on the input. We count only the coefficient information in the constraint, because the floor measures the spread that the coefficients induce, and probing cannot raise the information about $W$. The coefficients add the covariance $\Sigma^\theta_{t+1} = \ell_t R_t$ to the prediction, so the floor is $\tfrac{n_y}{2}\ln(1 + \bar{\ell}_t) - \tfrac{1}{2}\ln|I + R_t^{-1}S_*|$, with the expected leverage $\bar{\ell}_t$ of the goal-reaching inputs. As the coefficient precision $\Lambda_t$ grows, this leverage falls, and the floor turns negative. The caution and probing terms of the first step are jointly minimised at the leverage
+\begin{equation}\label{eq:leverage-opt}
+	\ell^\circ = \max\big\{0,\, \gamma n_y / \tr(S_*^{-1}R_t) - 1\big\} \, ,
+\end{equation}
+so the multiplier that a given leverage requires scales with $\tr(S_*^{-1}R_t)/n_y$.
+
+The arm moves in the horizontal plane with a 0.5~kg payload and torque limits of 4~N\,m, and the controllers act every 0.1~s on the joint angles. The output $y_k \in \mathbb{R}^4$ holds the joint angles and velocities, and the 19 features are constant, linear and first-harmonic Fourier terms of the torques and the previous output. The prior comes from 600 excitation steps of a nominal simulator, tempered to the weight of 90 steps. The goal prior has the standard deviations 0.014~rad on the angles and 0.14~rad/s on the velocities. The floor averages over a grid of $39 \times 39$ inputs for the two torques.
+
+Under unknown polarity, each seed reverses none, one or both motors, and the controllers replace their prior over the affected coefficients by a zero-mean prior. An episode runs through four targets in each of four rounds, $T = 480$ steps in all, and we report the RMSE of the two joint angles over 10 test seeds per condition. Tuning on 6 held-out seeds per condition selects $\rho = 100$ under a known and $\rho = 300$ under an unknown polarity from $\{0, 10, 30, \dots, 10^5\}$. Under both conditions, it selects the accuracy $10^{-4}$ of MPC-X from seven values between $10^{-5}$ and $10^{-2}$.
+
+\begin{figure}[t]
+	\centering
+	\subfigure[Integrator, per prior mean $b_0$.]{\label{fig:sensitivity-integrator}\includegraphics[width=0.45\textwidth]{fig_integrator_sensitivity}}\hfill
+	\subfigure[Two-link arm, per polarity.]{\label{fig:sensitivity-arm}\includegraphics[width=0.45\textwidth]{fig_arm_sensitivity}}
+	\caption{RMSE of the dual MPC relative to that of CBFE against its probing weight $\rho$, on shared logarithmic axes. The blue line marks CBFE, which needs no tuning, and the diamond marks twice the median of its active multipliers; 200 episodes per prior mean and 10 seeds per condition.}
+	\label{fig:sensitivity-supp}
+\end{figure}
+
+Fig.~\ref{fig:sensitivity-supp} shows that the window of good probing weights lies two orders of magnitude higher on the arm than on the integrator, and that CBFE finds it without tuning on both systems. Under unknown polarity, CBFE attains an RMSE of 0.525~rad, against 0.523~rad and 0.505~rad for the dual MPC tuned with a known and with an unknown polarity. The paired differences are 0.002 [$-0.022$, 0.027] and 0.020 [$-0.003$, 0.043]. Weights up to $\rho = 30$, which include the tuned weight of the integrator, apply too little torque under unknown polarity, so the arm drifts under the process noise with an RMSE of 1.09 to 1.68~rad, as for the cautious controller. With a known polarity, CBFE attains 0.503~rad against 0.501~rad for the tuned dual MPC, whereas weights from $\rho = 3\cdot 10^4$ upward more than double the RMSE. MPC-X attains 0.595~rad under unknown polarity, 0.071 [0.009, 0.138] above CBFE.
+
+The multiplier supplies the probing weight that the unknown polarity requires and withdraws it once the model suffices for the goal. Its constraint is active on 10\% of the steps of the first round, including the first step of every seed, and never afterwards or with a known polarity. The active multipliers have a median of 363, and twice this median again lies inside the window of good weights. By~\eqref{eq:leverage-opt}, the scale $\tr(S_*^{-1}R_t)/n_y$ is 1 on the integrator and 46 on the arm, so the goal and the noise set the scale of the probing weight that tuning has to find. On one core, the planner takes a median of 9~ms per step on the arm, against a control period of 100~ms.
+
+%\emph{Takeaway:} One CBFE configuration comes within 4\% of dual MPCs that are tuned per system and per condition, although their weights differ by two orders of magnitude between the systems.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Sufficient Excitation for the Goal}\label{supp:excitation}
+
+The information constraint does not make the inputs persistently exciting, but it makes them sufficiently exciting for the goal. Persistent excitation requires an $N \geq 1$ and an $\alpha > 0$ such that $\sum_{k=t+1}^{t+N} \phi_k \phi_k^\top \succeq \alpha I$ for every $t \geq 0$~\citep{aastrom2013adaptive}. The smallest eigenvalue $\lambda_{\min}(\Lambda_t)$ of the coefficient precision~\eqref{eq:leverage} then grows without bound. The constraint asks only for the information that the goal-reaching inputs need, and Theorem~\ref{thm:excitation} makes this precise for the ARX model~\eqref{eq:arx} with constant coefficients and $n_\phi$ features. The integrator of Section~\ref{sec:integrator} is the special case with the regressor $\phi_k = u_k$ and the precision $\Lambda_t = \sigma^2/P_t$ of the gain.
+
+The floor of Section~\ref{supp:arm} compares the features of the goal-reaching inputs with the coefficient precision. Let $M_t = \E_{\tilde{p}_t}[\phi(u, y_t)\, \phi(u, y_t)^\top]$ be the second moment of the next feature vector under the goal-reaching inputs~\eqref{eq:goal-weights}, so that their expected leverage is $\bar{\ell}_t = \tr(\Lambda_t^{-1} M_t)$. The tolerated leverage $\ell_{*,t} > 0$, defined by $(1 + \ell_{*,t})^{n_y} = |I + R_t^{-1} S_*|$, is the leverage at which the predictive covariance $(1 + \ell) R_t$ has the entropy of the tolerated covariance $R_t + S_*$. It equals $s/\sigma^2$ for $R_t = \sigma^2 I$ and $S_* = s I$, so $\ell_* = 1$ on the integrator. The floor then reads
+\begin{equation}\label{eq:floor-leverage}
+	\beta_t = \frac{n_y}{2} \ln \frac{1 + \tr(\Lambda_t^{-1} M_t)}{1 + \ell_{*,t}} \, ,
+\end{equation}
+and the information $\mathbb{I}_{t+1}(u) = \tfrac{n_y}{2} \ln\big(1 + \ell_t(\phi(u, y_t))\big)$ of the next input has to reach it.
+
+We call the regressors $\phi_1, \dots, \phi_t$ \emph{sufficiently exciting for the goal} with tolerance $\ell > 0$ if their precision dominates the scaled second moment of the goal-reaching features,
+\begin{equation}\label{eq:sufficient}
+	\Lambda_t \succeq \ell^{-1} M_t \, .
+\end{equation}
+Unlike persistent excitation, \eqref{eq:sufficient} asks for a bounded amount of information instead of an amount that grows with $t$, because $M_t \preceq \Phi I$ for features bounded by $\Phi$. It also asks for this information only in the directions in which the goal-reaching inputs have features, and a larger tolerance asks for less. Theorem~\ref{thm:excitation} shows that the constraint keeps the regressors sufficiently exciting for the goal at all but logarithmically many steps.
+
+\begin{theorem}[Sufficient excitation for the goal]\label{thm:excitation}
+Let the features be bounded along the closed loop, $\|\phi(u, y_t)\|^2 \leq \Phi$ for all $u \in \cU$ and $t < T$.
+\begin{enumerate}
+	\item[(a)] If the regressors up to step $t$ are sufficiently exciting for the goal with tolerance $\ell_{*,t}/n_\phi$, then $\beta_t \leq 0$, and the multiplier of step $t$ vanishes. Conversely, $\beta_t \leq 0$ implies that they are sufficiently exciting for the goal with tolerance $\ell_{*,t}$.
+	\item[(b)] If $\lambda_{\min}(\Lambda_t) \geq \Phi / \ell_{*,t}$, then $\beta_t \leq 0$.
+	\item[(c)] If every input meets the information constraint, $\mathbb{I}_{t+1}(u_{t+1}) \geq \beta_t$ for $t = 0, \dots, T-1$, then
+	\begin{equation}\label{eq:excess-bound}
+		\sum_{t=0}^{T-1} \max(\beta_t, 0) \leq \frac{n_y}{2} \ln \frac{|\Lambda_T|}{|\Lambda_0|} \leq C_T = \frac{n_y n_\phi}{2} \ln\Big(1 + \frac{T \Phi}{n_\phi\, \lambda_{\min}(\Lambda_0)}\Big) \, .
+	\end{equation}
+	Hence, for every $\epsilon > 0$, the regressors are sufficiently exciting for the goal with tolerance $(1 + \ell_{*,t})\, e^{2\epsilon/n_y} - 1$ at all but at most $C_T/\epsilon$ of the steps $t < T$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proofof}{Theorem~\ref{thm:excitation}}
+\emph{(a)} The $n_\phi \times n_\phi$ matrix $A_t = \Lambda_t^{-1/2} M_t \Lambda_t^{-1/2}$ is positive semidefinite, and its trace is $\tr(\Lambda_t^{-1} M_t)$. By~\eqref{eq:floor-leverage}, $\beta_t \leq 0$ holds if and only if this trace is at most $\ell_{*,t}$. If $\Lambda_t \succeq n_\phi M_t/\ell_{*,t}$, then $A_t \preceq (\ell_{*,t}/n_\phi) I$, so the trace of $A_t$ is at most $\ell_{*,t}$, and $\beta_t \leq 0$. Every input then meets the constraint, because the information is nonnegative, and Lemma~\ref{lem:multiplier} gives a vanishing multiplier. Conversely, if the trace of $A_t$ is at most $\ell_{*,t}$, then so is its largest eigenvalue, because $A_t$ is positive semidefinite. Hence $A_t \preceq \ell_{*,t} I$, which is equivalent to $\Lambda_t \succeq M_t/\ell_{*,t}$.
+
+\emph{(b)} Since $\Lambda_t^{-1} \preceq \lambda_{\min}(\Lambda_t)^{-1} I$ and $M_t \succeq 0$, the expected leverage satisfies $\tr(\Lambda_t^{-1} M_t) \leq \tr(M_t)/\lambda_{\min}(\Lambda_t)$. The trace $\tr(M_t) = \E_{\tilde{p}_t}[\|\phi(u, y_t)\|^2]$ is at most $\Phi$, so $\lambda_{\min}(\Lambda_t) \geq \Phi/\ell_{*,t}$ gives $\tr(\Lambda_t^{-1} M_t) \leq \ell_{*,t}$, and~\eqref{eq:floor-leverage} gives $\beta_t \leq 0$.
+
+\emph{(c)} The applied input adds the regressor $\phi_{t+1} = \phi(u_{t+1}, y_t)$ to the precision, $\Lambda_{t+1} = \Lambda_t + \phi_{t+1} \phi_{t+1}^\top$, and the matrix determinant lemma gives $|\Lambda_{t+1}| = (1 + \ell_t(\phi_{t+1}))\, |\Lambda_t|$. The information of the applied input is therefore $\mathbb{I}_{t+1}(u_{t+1}) = \tfrac{n_y}{2} \ln (|\Lambda_{t+1}|/|\Lambda_t|)$. This information is nonnegative and at least $\beta_t$, so it is at least $\max(\beta_t, 0)$, and the sum over $t$ telescopes to the first inequality of~\eqref{eq:excess-bound}. For the second inequality, let $\nu_1, \dots, \nu_{n_\phi}$ be the eigenvalues of $\Lambda_0^{-1/2} \Lambda_T \Lambda_0^{-1/2}$. Their sum is $n_\phi + \sum_{k=1}^{T} \phi_k^\top \Lambda_0^{-1} \phi_k \leq n_\phi + T\Phi/\lambda_{\min}(\Lambda_0)$, and the inequality of arithmetic and geometric means gives $\ln(|\Lambda_T|/|\Lambda_0|) = \sum_{i} \ln \nu_i \leq n_\phi \ln(\sum_i \nu_i / n_\phi) \leq 2 C_T/n_y$. Finally, every step with $\beta_t > \epsilon$ adds more than $\epsilon$ to the sum in~\eqref{eq:excess-bound}, so at most $C_T/\epsilon$ steps have $\beta_t > \epsilon$. At every other step, \eqref{eq:floor-leverage} gives $\tr(\Lambda_t^{-1} M_t) \leq (1 + \ell_{*,t})\, e^{2\epsilon/n_y} - 1$, and the converse in part~(a) applies with this tolerance.
+\end{proofof}
+
+The constraint stops asking for information once the precision reaches a finite level, so it cannot sustain persistent excitation. With a known noise covariance, the tolerated leverage $\ell_*$ is constant, and the precision $\Lambda_t$ never decreases. Part~(b) then keeps the constraint inactive at every step after $\lambda_{\min}(\Lambda_t)$ first reaches $\Phi/\ell_*$, whereas persistent excitation lets $\lambda_{\min}(\Lambda_t)$ grow without bound. On the integrator, $\Phi = 1$ and $\ell_* = 1$, so the constraint switches off for good once the variance $P_t$ of the gain falls below $\sigma^2$. The consistency of the estimates after the constraint switches off, which Section~\ref{sec:discussion} leaves open, therefore depends on the excitation that the regulation and the noise provide.
+
+Part~(c) bounds how often the inputs fall short of sufficient excitation for the goal. Every nat by which the floor exceeds zero costs at least one nat of information, and the information of $T$ steps grows only logarithmically in $T$. The floor therefore exceeds $\epsilon$ on at most $C_T/\epsilon$ steps, a number that grows as $\epsilon^{-1} \ln T$. Fig.~\ref{fig:integrator-activity} shows the consequence on the integrator, where the constraint acts only in the first steps of an episode.
+
+The floor~\eqref{eq:floor-leverage} derives from the goal an information requirement of the kind that MPC-X imposes. MPC-X bounds the information matrix of the coefficients from below by a multiple $c$ of the Hessian of its application cost~\citep{larsson2013model}. With the application cost of Section~\ref{sec:experiments}, this requirement reads $R_t^{-1} \otimes \Lambda_t \succeq c\, S_*^{-1} \otimes M_t$ at the current precision. For $R_t = \sigma^2 I$ and $S_* = s I$, the requirement with $c = n_\phi$ implies $\beta_t \leq 0$ by part~(a), which in turn implies the requirement with $c = 1$. Both requirements coincide on the integrator, where $n_\phi = 1$.

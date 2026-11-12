@@ -92,6 +92,31 @@ def sensitivity_axes(ax, rho_cbfe=None) -> None:
     ax.set_ylabel("relative RMSE (log)", labelpad=2)
 
 
+# Single-row results figure of main.tex (PMLR, \textwidth = 6.0 in): three
+# panels of 0.32 \textwidth with the same plot area and a legend strip above
+# the axes, so that the axes of the three panels align.
+PMLR_TEXT_WIDTH = 6.0
+ROW_PANEL_SIZE = (0.32 * PMLR_TEXT_WIDTH, 1.42)
+ROW_MARGINS = dict(left=0.46, right=0.08, bottom=0.33, top=0.2)   # [in]
+
+
+def row_panel():
+    """A figure of one panel of the single-row results figure."""
+    width, height = ROW_PANEL_SIZE
+    fig = plt.figure(figsize=ROW_PANEL_SIZE)
+    fig.subplots_adjust(left=ROW_MARGINS["left"] / width, right=1 - ROW_MARGINS["right"] / width,
+                        bottom=ROW_MARGINS["bottom"] / height, top=1 - ROW_MARGINS["top"] / height)
+    return fig, fig.add_subplot()
+
+
+def top_legend(fig, handles, labels, **legend_kwargs) -> None:
+    """A legend strip in one row above the axes of a row panel."""
+    spacing = dict(loc="upper center", ncol=len(handles), frameon=False, fontsize=5.6, handlelength=1.5,
+                   columnspacing=0.8, handletextpad=0.3, borderaxespad=0.05)
+    spacing.update(legend_kwargs)
+    fig.legend(handles, labels, **spacing)
+
+
 # Lines that coincide with another agent's line are drawn first and wider,
 # so that they show as a band beneath it.
 UNDERLAY = {"gamma0": dict(lw=2.6)}
