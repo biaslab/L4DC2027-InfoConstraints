@@ -11,12 +11,12 @@ The paper treats dual control as constrained Bethe free energy minimisation (CBF
 
 | Paper | What it shows | Code |
 |---|---|---|
-| Section 5, Fig. 2 | Quadcopter with an unknown compass fault and wind | [`experiment-ablation/`](experiment-ablation), agent in [`agents/cbfe_quad/`](agents/cbfe_quad) |
-| Supplement S2.1–S2.4, Table S1 | Simulator, planning model, message passing and baselines of the quadcopter | [`agents/cbfe_quad/agent.py`](agents/cbfe_quad/agent.py), [`agents/cbfe_quad/messages.py`](agents/cbfe_quad/messages.py), [`experiment-ablation/ablation.py`](experiment-ablation/ablation.py) |
-| Supplement S2.3, last paragraph | Message passing planner against L-BFGS-B | [`experiment-ablation/run_message.py`](experiment-ablation/run_message.py) |
-| Supplement S2.5 | Protocol, seed sets and the logged setting search | [`experiment-ablation/search.py`](experiment-ablation/search.py), [`experiment-ablation/paper_data.py`](experiment-ablation/paper_data.py) |
-| Supplement S3.1, Fig. S1 | Integrator with unknown gain (Åström–Helmersson benchmark) | [`experiment-integrator/`](experiment-integrator), agent in [`agents/cbfe_arx/`](agents/cbfe_arx) |
-| Supplement S3.2, Fig. S2 | Light–dark positioning with a hidden state | [`experiment-lightdark/`](experiment-lightdark), agent in [`agents/cbfe_lightdark/`](agents/cbfe_lightdark) |
+| Section 5.2, Fig. 2 | Quadcopter with an unknown compass fault and wind | [`experiment-quadcopter/`](experiment-quadcopter), controller in [`controllers/cbfe_quad/`](controllers/cbfe_quad) |
+| Supplement S2.1–S2.4, Table S1 | Simulator, planning model, message passing and baselines of the quadcopter | [`controllers/cbfe_quad/agent.py`](controllers/cbfe_quad/agent.py), [`controllers/cbfe_quad/messages.py`](controllers/cbfe_quad/messages.py), [`experiment-quadcopter/ablation.py`](experiment-quadcopter/ablation.py) |
+| Supplement S2.3, last paragraph | Message passing planner against L-BFGS-B | [`experiment-quadcopter/run_message.py`](experiment-quadcopter/run_message.py) |
+| Supplement S2.5 | Protocol, seed sets and the logged setting search | [`experiment-quadcopter/search.py`](experiment-quadcopter/search.py), [`experiment-quadcopter/paper_data.py`](experiment-quadcopter/paper_data.py) |
+| Section 5.1, Fig. 3, supplement S2.6 | Integrator with unknown gain (Åström–Helmersson benchmark) | [`experiment-integrator/`](experiment-integrator), controller in [`controllers/cbfe_arx/`](controllers/cbfe_arx) |
+| Supplement S3.1, Fig. S1 | Light–dark positioning with a hidden state | [`experiment-lightdark/`](experiment-lightdark), controller in [`controllers/cbfe_lightdark/`](controllers/cbfe_lightdark) |
 
 Every script starts with a docstring that states what it computes, which files it reads and writes, and which part of the paper it belongs to.
 
@@ -24,7 +24,7 @@ Every script starts with a docstring that states what it computes, which files i
 
 The quadcopter code predates the final names of the controllers.
 
-| Paper | Label in `experiment-ablation/` |
+| Paper | Label in `experiment-quadcopter/` |
 |---|---|
 | info-CBFE | `CBFE` |
 | no-info-CBFE | `no constraint` |
@@ -42,7 +42,7 @@ The experiments were run with Python 3.14 on Linux. They need
 numpy>=2.4  scipy>=1.18  casadi>=3.8  pandas>=3.0  matplotlib>=3.11
 ```
 
-for example `pip install numpy scipy casadi pandas matplotlib`. Run every command below from the repository root. The scripts put the repository root on `sys.path` themselves, so `agents` imports without installation.
+for example `pip install numpy scipy casadi pandas matplotlib`. Run every command below from the repository root. The scripts put the repository root on `sys.path` themselves, so `controllers` imports without installation.
 
 ## Reproducing the results
 
@@ -51,12 +51,12 @@ Simulated flights of the quadcopter and the integrator are not in the repository
 ### Quadcopter (Section 5, Fig. 2)
 
 ```bash
-python experiment-ablation/run.py --fresh                  # all CBFE variants and the oracle -> data/episodes_fresh.pkl
-python experiment-ablation/run_baselines.py transfer       # tune rho and kappa on held-out seeds 3000-3049
-python experiment-ablation/run_baselines.py test --fresh   # tuned dual MPC and MPC-X -> data/baselines_test_fresh.pkl
-python experiment-ablation/plot_over_time.py --fresh       # Fig. 2(a)-(c) and the legend
-python experiment-ablation/plot.py --fresh                 # Fig. 2(d)
-python experiment-ablation/summary.py --fresh              # numbers of the Results paragraph -> results/summary_fresh.csv
+python experiment-quadcopter/run.py --fresh                  # all CBFE variants and the oracle -> data/episodes_fresh.pkl
+python experiment-quadcopter/run_baselines.py transfer       # tune rho and kappa on held-out seeds 3000-3049
+python experiment-quadcopter/run_baselines.py test --fresh   # tuned dual MPC and MPC-X -> data/baselines_test_fresh.pkl
+python experiment-quadcopter/plot_over_time.py --fresh       # Fig. 2(a)-(c) and the legend
+python experiment-quadcopter/plot.py --fresh                 # Fig. 2(d)
+python experiment-quadcopter/summary.py --fresh              # numbers of the Results paragraph -> results/summary_fresh.csv
 ```
 
 The quadcopter uses these seed sets (supplement S2.5):
@@ -74,23 +74,23 @@ Wall-clock times in Fig. 2(c)–(d) come from an AMD Ryzen AI 9 HX 370. At the n
 The message passing validation of supplement S2.3:
 
 ```bash
-python experiment-ablation/run_message.py shadow   # both planners on identical beliefs, seeds 1000-1009
-python experiment-ablation/run_message.py test     # closed-loop message passing planner, seeds 1000-1099
-python experiment-ablation/run_message.py report
+python experiment-quadcopter/run_message.py shadow   # both planners on identical beliefs, seeds 1000-1009
+python experiment-quadcopter/run_message.py test     # closed-loop message passing planner, seeds 1000-1099
+python experiment-quadcopter/run_message.py report
 ```
 
-### Integrator (supplement S3.1, Fig. S1)
+### Integrator (Section 5.1, Fig. 3, supplement S2.6)
 
 ```bash
-python experiment-integrator/run.py tune     # tune rho and the MPC-X accuracy on held-out seeds
+python experiment-integrator/run.py tune     # tune rho and the MPC-X accuracy by mean G on held-out seeds
 python experiment-integrator/run.py          # all controllers -> results/benchmark.pkl
 python experiment-integrator/plot_paper.py   # fig_integrator_sensitivity.pdf, fig_integrator_constraint.pdf
-python experiment-integrator/analysis.py     # numbers of the section
+python experiment-integrator/analysis.py     # numbers of Section 5.1 and S2.6, in G
 ```
 
 The first run solves the dynamic program of the optimal dual controller (about three minutes on 24 cores) and caches it.
 
-### Light–dark (supplement S3.2, Fig. S2)
+### Light–dark (supplement S3.1, Fig. S1)
 
 The stored results allow the figure to be redrawn directly:
 
@@ -108,13 +108,13 @@ main.tex, supplementary.tex   paper and supplement (PMLR / L4DC format, l4dc2027
 references.bib                bibliography of both
 graphs/                       TikZ sources of the factor graph (Fig. 1)
 figures/paper_style.py        shared matplotlib style, colours and legends of all figures
-agents/                       controllers
+controllers/                  CBFE and baseline controllers
   cbfe_quad/                    CBFE, dual MPC and MPC-X for the quadcopter, with the extended Kalman filter
   cbfe_arx/, dual_mpc/, mpcx/   CBFE and baselines on a Bayesian ARX model (integrator)
   cbfe_lightdark/               CBFE on a grid filter for the light-dark task
-  common.py                     code shared by the agents
-experiment-ablation/          quadcopter experiment (main paper)
-experiment-integrator/        integrator experiment (supplement)
+  common.py                     code shared by the controllers
+experiment-quadcopter/        quadcopter experiment (main paper)
+experiment-integrator/        integrator experiment (main paper)
 experiment-lightdark/         light-dark experiment (supplement)
 ```
 
@@ -122,8 +122,7 @@ Each experiment directory has its own `figures/`, `results/` and, where needed, 
 
 The following parts of the repository are not used in the submission. They are kept for transparency about the development history:
 
-- `experiment-arm/` and `experiment-planar/`: earlier candidate experiments (a two-link arm with unknown motor polarity, and planar positioning);
-- `agents/cbfe_fault/`, `agents/cbfe_nlssm/`, `agents/cbfe_ssm/`, `agents/pilco/` and `agents/tdmpc2/`: agents of these and earlier experiments;
+- `controllers/cbfe_fault/`, `controllers/cbfe_nlssm/`, `controllers/cbfe_ssm/`, `controllers/pilco/` and `controllers/tdmpc2/`: controllers of earlier candidate experiments (a two-link arm with unknown motor polarity, and planar positioning), which are no longer in the repository;
 - `figures/candidates/` directories and the `pilot_*.py` scripts: alternative panels and pilot runs;
 - quadcopter scripts `free_energy.py`, `plot_total.py`, `plot_by_fault.py` and `plot_free_energy.py`, which draw alternative views of the same flights.
 

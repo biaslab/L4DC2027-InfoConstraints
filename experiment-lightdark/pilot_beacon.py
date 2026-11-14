@@ -7,7 +7,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import numpy as np, pandas as pd
 import lightdark as L
-from agents.cbfe_lightdark import LightDarkModel
+from controllers.cbfe_lightdark import LightDarkModel
 from pilot_fix import trips
 
 SPECS = {"CBFE": {"kind": "agent", "planner": "cbfe"},

@@ -25,7 +25,7 @@ import numpy as np  # noqa: E402
 
 import lightdark as L  # noqa: E402
 import run_baselines as R  # noqa: E402
-from agents.cbfe_lightdark.agent import GridFilter  # noqa: E402
+from controllers.cbfe_lightdark.agent import GridFilter  # noqa: E402
 
 FILES = ("baselines_tuning", "baselines_test", "baselines_sweep", "transfer")
 

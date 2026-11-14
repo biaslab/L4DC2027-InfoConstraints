@@ -37,7 +37,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 import lightdark as L  # noqa: E402
-from agents.cbfe_lightdark import LightDarkModel  # noqa: E402
+from controllers.cbfe_lightdark import LightDarkModel  # noqa: E402
 
 KNOWN = replace(L.Benchmark(model=LightDarkModel(one_sided=True)), T=200)
 DIRECTIONAL = replace(KNOWN, gain_variance=0.09, directional=True)

@@ -36,7 +36,7 @@ PMLR_TEXT_WIDTH = 6.0                          # \textwidth of l4dc2027.cls [in]
 PANEL = (0.32 * PMLR_TEXT_WIDTH, 1.35)         # one of three panels in a row [in]
 TALL_PANEL = (PANEL[0], 2.3)                   # two stacked axes [in]
 
-# labels of run.py -> agents of paper_style, for the controllers of the paper
+# labels of run.py -> controllers of paper_style, for the controllers of the paper
 PAPER = {
     "CBFE-ARX, KKT β, predictive floor, next node": "kkt",
     "CBFE-ARX, β = 0": "gamma0",

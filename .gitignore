@@ -32,11 +32,9 @@ literature/
 submission/
 template/
 archive/
-experiment-arm/results/
 experiment-integrator/results/
-experiment-planar/results/
-experiment-ablation/results/
-experiment-ablation/data/
+experiment-quadcopter/results/
+experiment-quadcopter/data/
 experiment-drift/results/
 experiment-drift/data/
 experiment-computation/results/
@@ -49,6 +47,7 @@ reviews/
 *.aux
 *.bbl
 *.blg
+*.out
 *.log
 *.synctex.gz
 *.swp

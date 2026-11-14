@@ -5,7 +5,7 @@ experiments: CBFE against the dual MPC with a tuned and an untuned weight
     x_k = x_{k-1} + u_k + w_k ,   w_k ~ N(0, 10^-4) ,
     y_k = x_k + v_k ,             v_k ~ N(0, r(x_k)) ,
 
-with the noise r(x) of ``agents.cbfe_lightdark.LightDarkModel`` (one-sided:
+with the noise r(x) of ``controllers.cbfe_lightdark.LightDarkModel`` (one-sided:
 r_L in the light x >= 1.5, rising to 100 in the dark x <= 0), x_0 ~ N(0, 0.25)
 and T = 200 steps. The information is gathered for the hidden state x.
 
@@ -37,7 +37,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 import lightdark as L  # noqa: E402
-from agents.cbfe_lightdark import LightDarkModel  # noqa: E402
+from controllers.cbfe_lightdark import LightDarkModel  # noqa: E402
 
 GOAL = "tight"
 NOMINAL_LIGHT = math.sqrt(LightDarkModel().r0)      # std of the measurement noise in the light

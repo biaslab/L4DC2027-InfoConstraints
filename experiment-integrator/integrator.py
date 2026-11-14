@@ -46,7 +46,7 @@ Controllers
 Classical laws (on the exact Kalman filter, inputs clipped to |u| <= u_max):
 certainty equivalence u = -y / bhat and cautious control; unclipped, the
 optimal dual controller and the paper's approximation (5.1) of it. The ARX
-agents of ``agents/`` run on the same Bayesian model: features (1, u, y), the
+controllers of ``controllers/`` run on the same Bayesian model: features (1, u, y), the
 intercept and the pole known (prior precision 1e6 in noise units), the gain
 with prior N(b0, P0), and the noise known (nu0 = 1e4), so that their
 parameter posterior is the Kalman filter. Their goal prior is N(0, sigma^2),
@@ -75,7 +75,7 @@ import numpy as np  # noqa: E402
 from numpy.polynomial.legendre import leggauss  # noqa: E402
 from scipy.interpolate import RectBivariateSpline  # noqa: E402
 
-from agents.common import MatrixNormalWishart, MultivariateNormal  # noqa: E402
+from controllers.common import MatrixNormalWishart, MultivariateNormal  # noqa: E402
 
 RESULTS = HERE / "results"
 
@@ -86,8 +86,8 @@ class Benchmark:
     b0: float = 0.0           # prior mean of the gain
     P0: float = 1.0           # prior variance of the gain
     T: int = 50               # steps; the loss sums y_1 ... y_T
-    u_max: float = 1.0        # input bound of the clipped laws and the agents
-    K: int = 5                # planning horizon of the MPC agents
+    u_max: float = 1.0        # input bound of the clipped laws and the controllers
+    K: int = 5                # planning horizon of the MPC controllers
     known: float = 1e6        # prior precision of the intercept and the pole (noise units)
     nu0: float = 1e4          # Wishart degrees of freedom: the noise level is known
     dither: float = 0.0       # std of a known perturbation added to every applied input
@@ -110,6 +110,15 @@ class Episode:
 
     def loss(self, sigma: float) -> float:
         return float(np.sum(self.y[1:] ** 2) / sigma**2)
+
+    def G(self, sigma: float) -> float:
+        """G of eq. (metric) of main.tex: the mean over the steps of half the
+        precision-weighted error of the one-step prediction of y_t by the
+        Kalman filter of the gain, N(y_{t-1} + bhat u, sigma^2 + P u^2), plus
+        the goal cost y_t^2 / (2 sigma^2) under the goal prior N(0, sigma^2)."""
+        y, u, bhat, P = self.y, self.u, self.bhat[:-1], self.P[:-1]
+        error = (y[1:] - y[:-1] - bhat * u) ** 2 / (sigma**2 + P * u * u)
+        return float(np.mean(0.5 * error + 0.5 * y[1:] ** 2 / sigma**2))
 
 
 def kalman(bhat, P, y, u, y_next, sigma):
@@ -386,7 +395,7 @@ def policy_values(dp: DualDP, law, T: int) -> DualDP:
 
 
 def bayes_prior(bench: Benchmark) -> MatrixNormalWishart:
-    """The MNW prior of the ARX agents over features (1, u, y): the gain
+    """The MNW prior of the ARX controllers over features (1, u, y): the gain
     with prior N(b0, P0), the intercept 0 and the pole 1 known, and the noise
     level sigma known."""
     s2 = bench.sigma**2
@@ -398,7 +407,7 @@ def bayes_prior(bench: Benchmark) -> MatrixNormalWishart:
 
 
 class ARXController:
-    """An agent of ``agents/`` on the benchmark model (see the module
+    """An agent of ``controllers/`` on the benchmark model (see the module
     docstring)."""
 
     def __init__(self, agent, bench: Benchmark):
@@ -450,7 +459,7 @@ def make_controller(spec: dict, bench: Benchmark):
     if kind == "dual_approx":
         return ApproximateDual(bench)
     if kind == "cbfe":
-        from agents.cbfe_arx import Agent
+        from controllers.cbfe_arx import Agent
         agent = Agent.build(input_dim=1, output_dim=1, input_memory=0, output_memory=1,
                             goal_prior=goal(bench), horizon=bench.K, num_harmonics=0,
                             fixed_multiplier=spec.get("fixed_beta"),
@@ -459,7 +468,7 @@ def make_controller(spec: dict, bench: Benchmark):
                             max_multiplier=spec.get("max_multiplier", 50.0))
         return ARXController(agent, bench)
     if kind == "dual":
-        from agents.dual_mpc import DualMPC
+        from controllers.dual_mpc import DualMPC
         agent = DualMPC.build(input_dim=1, output_dim=1, input_memory=0, output_memory=1,
                               goal_prior=goal(bench), horizon=bench.K,
                               probing_weight=spec["lambda_dual"], effort_weight=2.0,
@@ -468,7 +477,7 @@ def make_controller(spec: dict, bench: Benchmark):
         agent.config.input_cost = spec.get("input_cost", "quadratic")
         return ARXController(agent, bench)
     if kind == "mpcx":
-        from agents.mpcx import MPCX
+        from controllers.mpcx import MPCX
         agent = MPCX.build(input_dim=1, output_dim=1, input_memory=0, output_memory=1,
                            goal_prior=goal(bench), horizon=bench.K, accuracy=spec["gamma"],
                            experiment_length=bench.T, effort_weight=2.0, num_harmonics=0)
@@ -521,7 +530,7 @@ def run_episode(spec: dict, bench: Benchmark, seed: int) -> Episode:
 def run_job(job: dict) -> dict:
     ep = run_episode(job["spec"], job["bench"], job["seed"])
     return dict(label=job["label"], b0=job["bench"].b0, seed=job["seed"], episode=ep,
-                loss=ep.loss(job["bench"].sigma))
+                loss=ep.loss(job["bench"].sigma), G=ep.G(job["bench"].sigma))
 
 
 def run_many(jobs, processes: Optional[int] = None) -> list:

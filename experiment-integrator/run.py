@@ -4,7 +4,8 @@ Every controller regulates the integrator for T = 50 steps from y_0 = 0,
 with the gain drawn from its prior N(b0, 1) per seed, for the prior means
 b0 in B0. Small b0 = beta0 is the regime where the cautious controller
 turns off. The probing weight of the dual MPC and the accuracy of MPC-X are
-chosen on held-out seeds (1000-1049) by the mean loss over all priors:
+chosen on held-out seeds (1000-1049) by the mean of G (eq. (metric) of
+main.tex, ``Episode.G``) over all priors:
 
     python experiment-integrator/run.py tune    # writes results/tuning.pkl
     python experiment-integrator/run.py         # writes results/benchmark.pkl
@@ -112,11 +113,25 @@ def run(specs: dict, seeds, bench: I.Benchmark = I.Benchmark(), processes=None) 
 
 
 def summary(results) -> str:
+    """Mean G per controller and prior mean, and over all prior means."""
     import pandas as pd
-    df = pd.DataFrame([dict(label=r["label"], b0=r["b0"], loss=r["loss"]) for r in results])
-    table = df.pivot_table(index="label", columns="b0", values="loss", aggfunc="mean", sort=False)
-    table["all"] = df.groupby("label", sort=False).loss.mean()
-    return table.round(1).to_string()
+    sigma = I.Benchmark().sigma
+    df = pd.DataFrame([dict(label=r["label"], b0=r["b0"], G=r["episode"].G(sigma)) for r in results])
+    table = df.pivot_table(index="label", columns="b0", values="G", aggfunc="mean", sort=False)
+    table["all"] = df.groupby("label", sort=False).G.mean()
+    return table.round(3).to_string()
+
+
+def tuned(results) -> str:
+    """The probing weights and the accuracy with the lowest mean G over all prior means."""
+    sigma = I.Benchmark().sigma
+    mean = {}
+    for r in results:
+        mean.setdefault(r["label"], []).append(r["episode"].G(sigma))
+    mean = {label: sum(g) / len(g) for label, g in mean.items()}
+    best = lambda prefix: min((m, label) for label, m in mean.items() if label.startswith(prefix))  # noqa: E731
+    return "\n".join(f"tuned {prefix}: {label} (mean G {m:.4f})" for prefix in ("dual MPC, λ", "dual MPC, Beta", "MPC-X")
+                     for m, label in [best(prefix)])
 
 
 def main():
@@ -144,6 +159,8 @@ def main():
         results = [r for r in I.load(name) if r["label"] not in specs] + results
     print(I.save(results, name))
     print(summary(results))
+    if args.mode == "tune":
+        print(tuned(results))
 
 
 if __name__ == "__main__":

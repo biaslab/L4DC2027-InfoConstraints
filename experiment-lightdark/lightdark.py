@@ -5,7 +5,7 @@
 
 with |u| <= 1 and the input gain 1. With ``gain_variance > 0``, the input
 enters as b u_k with an unknown gain b ~ N(gain_mean, gain_variance), and the
-agents estimate it jointly with the state. The state starts at x_0 ~ N(0, V_0),
+controllers estimate it jointly with the state. The state starts at x_0 ~ N(0, V_0),
 the controllers know this prior, and every episode regulates the state to the target x_* = 0 over T
 steps under a tight (S_* = 0.01) or a loose (S_* = 0.1) goal. The target lies
 in the dark (r(0) = 1); the light at x_L = 1 measures the state precisely. A
@@ -13,7 +13,7 @@ seed fixes the initial state and the noise, so all controllers of a
 comparison see the same draws.
 
 Controllers (``make_controller``), all on the exact grid filter of
-``agents.cbfe_lightdark``:
+``controllers.cbfe_lightdark``:
 
     {"kind": "agent", "planner": "cbfe" | "none" | "bsp"}
     {"kind": "agent", "planner": "dual", "weight": rho / 2}
@@ -42,7 +42,7 @@ if str(HERE.parent) not in sys.path:
 import numpy as np  # noqa: E402
 from scipy.ndimage import map_coordinates  # noqa: E402
 
-from agents.cbfe_lightdark import (DirectionalAgent, GainConfig, GainLightDarkAgent, GridFilter,  # noqa: E402
+from controllers.cbfe_lightdark import (DirectionalAgent, GainConfig, GainLightDarkAgent, GridFilter,  # noqa: E402
                                    JointGridFilter, LightDarkAgent, LightDarkConfig, LightDarkModel)
 
 RESULTS = HERE / "results"

@@ -11,10 +11,14 @@ written to figures/:
                                  (main-extended.tex only)
     fig_integrator_constraint.pdf  episodes in which the information constraint
                                  of the paper's CBFE is active, per step and
-                                 prior mean (main.tex, Fig. 2a)
+                                 prior mean (main.tex, Fig. 3 right)
     fig_integrator_sensitivity.pdf  RMSE of the dual MPC relative to that of
                                  CBFE against its probing weight, per prior
-                                 mean b0 (supplementary.tex)
+                                 mean b0 (main.tex, Fig. 3 left)
+
+The two panels of Fig. 3 are drawn at their printed widths, 0.45 and 0.4 of
+the PMLR text width, and at the height of the panels of Fig. 2, with their
+legends inside the axes.
     legend_integrator.pdf       the legend of this row in main-extended.tex
 
 The legends of the figures of main.tex come from figures/paper_style.py.
@@ -38,7 +42,7 @@ import paper_style as S  # noqa: E402
 import run as Run  # noqa: E402
 
 FIGURES = HERE / "figures"
-# labels of run.py -> agents of paper_style
+# labels of run.py -> controllers of paper_style
 AGENT = {
     "CBFE-ARX, KKT β": "kkt",
     "CBFE-ARX, β = 0": "gamma0",
@@ -50,10 +54,24 @@ AGENT = {
     "optimal dual (DP)": "optimal",
 }
 LOSS_ORDER = ["gamma0", "gamma1", "ce", "negentropy", "dual", "mpcx", "kkt"]
-# agents of the RMSE panel; the optimal dual controller is drawn first
+# controllers of the RMSE panel; the optimal dual controller is drawn first
 RMSE_ORDER = ["dual", "mpcx", "kkt"]
 ACTIVITY_STEPS = 15
 EPISODE_AGENTS = ["gamma0", "optimal", "kkt"]
+# Panels of Fig. 3 of main.tex, at their printed width and at the height and
+# margins of the panels of Fig. 2 (experiment-quadcopter/plot.py, COMPACT)
+PAPER_HEIGHT = 1.15                                                     # [in]
+PAPER_MARGINS = dict(left=0.42, right=0.08, bottom=0.33, top=0.06)      # [in]
+
+
+def paper_panel(fraction: float):
+    """A panel of ``fraction`` of the PMLR text width, drawn at its printed size."""
+    import matplotlib.pyplot as plt
+    width, m = fraction * S.PMLR_TEXT_WIDTH, PAPER_MARGINS
+    fig = plt.figure(figsize=(width, PAPER_HEIGHT))
+    fig.subplots_adjust(left=m["left"] / width, right=1 - m["right"] / width,
+                        bottom=m["bottom"] / PAPER_HEIGHT, top=1 - m["top"] / PAPER_HEIGHT)
+    return fig, fig.add_subplot()
 
 
 def loss_ratio(results) -> pd.DataFrame:
@@ -118,35 +136,45 @@ CBFE = "CBFE-ARX, KKT β, predictive floor, next node"
 
 
 def plot_sensitivity(results, path) -> None:
-    """RMSE of the dual MPC with the Beta input cost over its probing weight,
-    relative to the RMSE of CBFE, per prior mean b0. The weight 0 coincides
-    with 0.5 and is omitted on the logarithmic axis."""
-    rmse = {}
+    """G (``integrator.Episode.G``) of the dual MPC with the Beta input cost
+    over its probing weight, relative to G of CBFE, per prior mean b0. The
+    weight 0 coincides with 0.5 and is omitted on the logarithmic axis."""
+    sigma = I.Benchmark().sigma
+    perf = {}
     for r in results:
         if r["label"] == CBFE or r["label"].startswith("dual MPC, Beta cost"):
-            rmse.setdefault((r["label"], r["b0"]), []).append(np.sqrt(np.mean(r["episode"].y[1:] ** 2)))
-    rmse = {key: np.mean(values) for key, values in rmse.items()}
+            perf.setdefault((r["label"], r["b0"]), []).append(r["episode"].G(sigma))
+    perf = {key: np.mean(values) for key, values in perf.items()}
     weights = [w for w in Run.LAMBDAS if w > 0]
-    fig, ax = S.panel(S.WIDE_PANEL_SIZE)
+    fig, ax = paper_panel(0.45)
     beta = np.concatenate([r["episode"].beta for r in results if r["label"] == CBFE])
     S.sensitivity_axes(ax, rho_cbfe=2 * np.median(beta[beta > 0]))
-    # The panel stands alone in the supplement, so the x-axis spans this grid
-    # of weights instead of the range shared with the arm. The ratios span
-    # less than a decade, so the y-axis is linear with even ticks.
+    # The panel shows the integrator only, so the x-axis spans this grid
+    # of weights. The y-axis is linear with even ticks and stops at TOP, so
+    # that the window of good weights stays visible; the weights that leave
+    # the dual MPC idle under b0 = 0 lie far above it, and a label gives
+    # their ratio.
+    top = 2.2
     ax.set_xlim(0.35, 75)
     ax.xaxis.set_major_locator(FixedLocator([1, 10]))
     ax.set_xticklabels(["1", "10"])
     ax.set_yscale("linear")
-    ax.set_ylim(0.85, 3.75)
-    ax.yaxis.set_major_locator(FixedLocator([1, 2, 3]))
+    ax.set_ylim(0.85, top)
+    ax.yaxis.set_major_locator(FixedLocator([1.0, 1.5, 2.0]))
     ax.yaxis.set_minor_locator(NullLocator())
-    ax.set_ylabel("relative RMSE", labelpad=2)
+    ax.set_ylabel(r"relative $G$", labelpad=2)
     for color, b0 in zip(S.ORANGE_RAMP, Run.B0):
-        ratio = [rmse[(Run.dual_beta_label(w), b0)] / rmse[(CBFE, b0)] for w in weights]
+        ratio = [perf[(Run.dual_beta_label(w), b0)] / perf[(CBFE, b0)] for w in weights]
         ax.plot(weights, ratio, color=color, marker="s", ms=2.8, mec="white", mew=0.4, lw=1.0,
                 label=fr"$b_0 = {b0:g}$", zorder=4)
-    ax.legend(loc="upper right", frameon=False, handlelength=1.3, labelspacing=0.15,
-              borderaxespad=0.1, fontsize=5.6, title="integrator", title_fontsize=5.8)
+        off = [w for w, q in zip(weights, ratio) if q > top]
+        if off:
+            x = float(np.sqrt(off[0] * off[-1]))
+            ax.annotate(f"{max(ratio):.1f}", xy=(x, top), xytext=(x, top - 0.32), ha="center", va="bottom",
+                        fontsize=6, color=color, annotation_clip=False,
+                        arrowprops=dict(arrowstyle="->", color=color, lw=0.7, shrinkA=0, shrinkB=0))
+    ax.legend(loc="upper right", ncol=2, frameon=False, handlelength=1.1, labelspacing=0.15, columnspacing=0.6,
+              handletextpad=0.4, borderaxespad=0.15, fontsize=5.6)
     S.save(fig, path)
 
 
@@ -166,24 +194,22 @@ def plot_activity(results, path) -> None:
 
 
 def plot_constraint(results, path, steps: int = 10) -> None:
-    """Panel (a) of the results figure of main.tex: share of the episodes
-    in which the information constraint of CBFE (the controller of the
-    paper) is active, per step and prior mean b0."""
-    from matplotlib.lines import Line2D
+    """Right panel of Fig. 3 of main.tex: share of the episodes in which the
+    information constraint of CBFE (the controller of the paper) is active,
+    per step and prior mean b0. The legend fills the empty upper right,
+    because the constraint acts only in the first steps."""
     cbfe = [r for r in results if r["label"] == CBFE]
     k = np.arange(1, steps + 1)
-    fig, ax = S.row_panel()
-    handles = []
+    fig, ax = paper_panel(0.4)
     for color, b0 in zip(S.BLUE_RAMP, Run.B0):
         active = np.mean([r["episode"].beta[:steps] > 0 for r in cbfe if r["b0"] == b0], axis=0)
-        style = dict(color=color, marker="o", ms=2.8, mec="white", mew=0.4, lw=1.1)
-        ax.plot(k, 100 * active, **style, zorder=4 - Run.B0.index(b0) / 10)
-        handles.append(Line2D([], [], **style))
+        ax.plot(k, 100 * active, color=color, marker="o", ms=2.8, mec="white", mew=0.4, lw=1.1,
+                zorder=4 - Run.B0.index(b0) / 10, label=fr"$b_0 = {b0:g}$")
     ax.set(xlim=(0.6, steps + 0.4), ylim=(-4, 104), xticks=[1, 4, 7, 10], yticks=[0, 25, 50, 75, 100])
     ax.set_xlabel(r"step $t$")
-    ax.set_ylabel("active episodes [%]", labelpad=2)
-    S.top_legend(fig, handles, [r"$b_0 = 0$"] + [f"{b0:g}" for b0 in Run.B0[1:]], handlelength=1.1,
-                 columnspacing=0.6)
+    ax.set_ylabel("active [%]", labelpad=2)
+    ax.legend(loc="upper right", frameon=False, handlelength=1.3, labelspacing=0.15, borderaxespad=0.2,
+              fontsize=6)
     S.save(fig, path)
 
 

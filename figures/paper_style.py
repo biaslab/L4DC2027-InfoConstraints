@@ -1,10 +1,10 @@
 """Shared style of the result figures of main.tex and main-extended.tex.
 
-The panels come from the visualisation scripts of two experiments,
-experiment-integrator/plot_paper.py and experiment-arm/plot_paper.py. Both
-import this module, so that an agent has the same colour and marker in
-every panel, and every panel has the same size and plot area, so that two
-subfigures fill one column and four fill one row over the text width.
+The panels come from the visualisation scripts of the experiments, such as
+experiment-integrator/plot_paper.py. They import this module, so that a
+controller has the same colour and marker in every panel, and every panel
+has the same size and plot area, so that two subfigures fill one column and
+four fill one row over the text width.
 Running this module writes the shared legends of the figures:
 
     python figures/paper_style.py      # writes figures/legend_rmse.pdf (main.tex)
@@ -191,11 +191,11 @@ def save(fig, path) -> None:
     plt.close(fig)
 
 
-# agents in the legend of the four-panel figure of main-extended.tex
+# controllers in the legend of the four-panel figure of main-extended.tex
 RESULTS_LEGEND = ["kkt", "gamma0", "gamma1", "negentropy", "dual", "dual_100", "mpcx", "ce",
                   "optimal", "pd", "pilco", "tdmpc2"]
 
-# agents in the legend of the RMSE figure of main.tex, in one row over the
+# controllers in the legend of the RMSE figure of main.tex, in one row over the
 # column width; the caption says that the baselines are tuned
 RMSE_LEGEND = ["kkt", "dual", "mpcx", "optimal"]
 RMSE_LABELS = {

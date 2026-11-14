@@ -11,7 +11,7 @@
 \usepackage{booktabs}
 \setlength{\emergencystretch}{1.5em} % lets lines with long inline math break instead of running into the margin
 % Sub-figures use the \subfigure command of the jmlr class, which clashes with the subfig package.
-\graphicspath{{figures/}{experiment-integrator/figures/}{experiment-arm/figures/}{experiment-lightdark/figures/}{experiment-ablation/figures/}}
+\graphicspath{{figures/}{experiment-integrator/figures/}{experiment-lightdark/figures/}{experiment-quadcopter/figures/}}
 
 \usepackage{tikz}
 \usetikzlibrary{positioning,calc}
@@ -96,7 +96,7 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}%
-This paper addresses dual control, i.e., the design of a control system that simultaneously must collect data for system identification and regulate the system towards a target. We treat dual control as a Bayesian inference problem and propose a method that favours identification when standard inputs are predicted to lead to insufficient information. We formulate a Bethe free energy functional over the factor graph of a planning model and impose an information gain constraint between future outputs and the beliefs over unknown parameters and hidden states, given the system inputs. This functional is minimized through message passing, producing a dual controller that does not require separate tuning of a probing weight. Our approach is tested on a quadcopter navigation problem, where the system suffers from unknown compass fault. The constrained Bethe free energy controller performs on par with optimally tuned state-of-the-art dual controllers, without tuning.
+This paper addresses dual control, i.e., the design of a control system that simultaneously must collect data for system identification and regulate the system towards a target. We treat dual control as a Bayesian inference problem and propose a method that favours identification when standard inputs are predicted to lead to insufficient information. We formulate a Bethe free energy functional over the factor graph of a planning model and impose an information gain constraint between future outputs and the beliefs over unknown parameters and hidden states, given the system inputs. This functional is minimized through message passing, producing a dual controller that does not require separate tuning of a probing weight. Our approach is tested on a benchmark integrator and a quadcopter navigation problem, both with unknown parameters. The constrained Bethe free energy controller performs on par with optimally tuned state-of-the-art dual controllers, without tuning.
 \end{abstract}
 
 \begin{keywords}%
@@ -107,18 +107,20 @@ This paper addresses dual control, i.e., the design of a control system that sim
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}\label{sec:intro}
 
-Dual control refers to the problem of driving a system with unknown parameters, requiring both learning and control~\citep{feldbaum1960dual}. The optimal dual controller stems from dynamic programming, but it is intractable except in special cases~\citep{barshalom1974dual,mesbah2018stochastic}. Most explicit dual controllers consist of a model predictive control (MPC) cost with an added excitation or uncertainty term~\citep{mesbah2018stochastic,heirung2017dual}. But this creates the problem of balancing probing and regulation, also known as the exploration versus exploitation trade-off \citep{levine2018reinforcement}. Standard dual controllers tune a weight term to a specific system and task, but that leaves the balance frozen. MPC with integrated experiment design (MPC-X) instead imposes an information requirement, but that also depends tuning~\citep{larsson2013model}. We aim to design a dual controller with an information requirement that is re-evaluated online.
+Dual control refers to the problem of driving a system with unknown parameters, where one system must simultaneously perform online system identification and adaptive control~\citep{feldbaum1960dual}. 
+%In special cases, it is possible to derive an optimal dual controller from dynamic programming~\citep{barshalom1974dual,mesbah2018stochastic}. 
+Most dual controllers consist of a model predictive control (MPC) cost with an added excitation or uncertainty term~\citep{mesbah2018stochastic,heirung2017dual}. This necessitates balancing probing and regulation, also known as the exploration versus exploitation trade-off \citep{levine2018reinforcement}. Dual controllers typically tune a weight term to a specific system and task, but that leaves the balance frozen \citep{larsson2013model,mesbah2018stochastic}. 
+The aim is to design a dual controller that re-evaluates the need for information gathering every time step.
 
-Inference on factor graphs offers a structured alternative, because message passing computes posterior beliefs from local operations on the graph of a probabilistic model~\citep{loeliger2007factor}. Control as inference plans by message passing on a model whose factors encode the costs~\citep{levine2018reinforcement,hoffmann2017linear}. The Bethe free energy is a variational objective over the local beliefs of a factor graph, and belief propagation and variational message passing find its stationary points under different local constraints~\citep{yedidia2005constructing,csenoz2021variational}. Active inference adds an information gain to the goal-seeking objective through the expected free energy, but is largely limited to discrete-state discrete-action planning~\citep{van2022active,kouw2026expected}.
+We approach dual control as a Bayesian inference problem, implemented as message passing on a factor graph~\citep{loeliger2007factor}. This is an efficient inference scheme as it leverages the factorization structure of dynamical models and flexible as it allows for approximations and constraints specific to individual nodes and edges~\citep{levine2018reinforcement,hoffmann2017linear}. The Bethe free energy is a variational objective over the local beliefs of a factor graph, and is a general framework encompassing a number of well-known inference algorithms, such as belief propagation and variational message passing~\citep{yedidia2005constructing,csenoz2021variational}. 
+%Active inference adds an information gain to the goal-seeking objective through the expected free energy, but is largely limited to discrete-state discrete-action planning~\citep{van2022active,kouw2026expected}.
 
-We show that an information constraint on the Bethe free energy brings probing into the control posterior with a weight that the goal determines. The constraint takes its tolerance from the goal prior and its Karush--Kuhn--Tucker (KKT) multiplier vanishes once the parameter-induced spread of the predictions fits within that tolerance. Since the parameter belief stays fixed within the plan, the controller is an explicit dual controller in the sense of \citet{mesbah2018stochastic}. 
-
-Our contribution is a dual controller whose probing weight follows from the goal. We formulate dual control as constrained Bethe free energy minimisation on a factor graph, with information constraints whose floors come from the need to reach a goal with sufficient certainty (Definition~\ref{def:info}). Their KKT multipliers act as probing weights that vanish once the controls are sufficiently informative (Theorem~\ref{thm:posterior}, Lemma~\ref{lem:multiplier}). We test our approach on a quadcopter navigation task with an unknown compass fault, demonstrating competitive performance without probing weight tuning (Section~\ref{sec:quadcopter}). 
+MPC with integrated experiment design (MPC-X) imposes an information requirement on controls, but requires independent weight tuning~\citep{larsson2013model}. We formulate dual control as constrained Bethe free energy minimization on a factor graph, with information constraints whose floors come from the need to reach a goal with sufficient certainty (Definition~\ref{def:info}). Their KKT multipliers act as probing weights that vanish once the controls are sufficiently informative (Theorem~\ref{thm:posterior}, Lemma~\ref{lem:multiplier}). Since the parameter belief stays fixed within the plan, the controller is an explicit dual controller in the sense of \citet{mesbah2018stochastic}. We test our approach on a benchmark integrator with unknown gain and a quadcopter navigation task with an unknown compass fault, demonstrating competitive performance without probing weight tuning (Section~\ref{sec:experiments}). 
 %At the nominal sensor noise, the controller matches a dual MPC tuned at that noise, and it lowers the learning cost, the goal cost above that of an oracle, by 24\% against MPC-X and by 26\% against a cautious controller.
 %Third, on a light--dark task with a hidden state, the untuned controller matches a tuned MPC-X in a precise light, whereas a dual MPC beats it only at the light noise at which we tune its probing weight (Section~\ref{sec:lightdark}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Problem Statement}\label{sec:problem}
+\section{Problem statement}\label{sec:problem}
 
 Consider discrete-time systems with unknown parameters,
 \begin{equation}\label{eq:system}
@@ -135,27 +137,28 @@ G = \frac{1}{T} \sum_{k=1}^{T}  \frac{1}{2} \|y_k - \mu_k \|^2_{\Sigma_k^{-1}} +
 \end{equation} 
 where $\mu_k$ and $\Sigma_k$ are the mean and covariance matrix of the predictive distribution.
 %It accounts for the effect of the inputs on future beliefs by dynamic programming over the joint belief of state and parameters~\citep{feldbaum1960dual,barshalom1974dual}. Optimising open-loop input sequences instead ignores that future measurements will arrive, so the resulting controller is cautious and has no incentive to probe~\citep{barshalom1974dual,mesbah2018stochastic}. Under large parameter uncertainty, caution can even switch the input off, which stalls learning~\citep{aastrom1986dual}. We therefore ask how a receding-horizon controller can derive the amount of information to gather from its goal, as a stationary point of an objective that message passing on a factor graph optimises.
-How should a receding-horizon controller gather information about $\theta$ such that it minimises $G$?
+How should a receding-horizon controller gather information about $\theta$ such that it minimizes $G$?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Probabilistic Models}\label{sec:model}
+\section{Probabilistic models}\label{sec:model}
 
 We frame dual control as a Bayesian inference problem.
 Let $\tau = (t + 1, \dots, t + K)$ be a finite horizon and $\phi_* = (y_*, S_*)$. A probabilistic state-space model over the planning horizon is:
 \begin{equation} \label{eq:probssm}
-	p(y_\tau, x_\tau, u_\tau, \theta, x_t \given \phi_*) = \underbrace{p(x_t) p(\theta)}_{\text{priors}} \prod_{k \in \tau} \underbrace{p(y_k \given x_k)}_{\text{likelihood}} \underbrace{p(x_{k} \given x_{k-1}, \theta, u_k)}_{\text{state transition}} \underbrace{p(u_k)}_{\text{control prior}} \underbrace{p(y \given \phi_*)}_{\text{goal prior}} \, .
+	p(y_\tau, x_\tau, u_\tau, \theta, x_t \given \phi_*) \propto \underbrace{p(x_t) p(\theta)}_{\text{priors}} \prod_{k \in \tau} \underbrace{p(y_k \given x_k)}_{\text{likelihood}} \underbrace{p(x_{k} \given x_{k-1}, \theta, u_k)}_{\text{state transition}} \underbrace{p(u_k)}_{\text{control prior}} \underbrace{p(y_k \given \phi_*)}_{\text{goal prior}} \, .
 \end{equation}
 With $s = (y_\tau, u_\tau, \theta, x_\tau, x_t)$, the model is a product of factors, $p(s) \propto \prod_{a \in \mathcal{V}} f_a(s_a)$ where every factor $f_a$ of the set $\mathcal{V}$ depends on a subset $s_a$ of the variables. A Forney-style factor graph (FFG) draws every factor as a node and every variable as an edge between at most two nodes, and an equality node joins the edges of a variable with more than two factors~\citep{loeliger2007factor}. Unlike bipartite factor graphs, FFGs make sequential computations explicit.
-Fig.~\ref{fig:ffg} shows the FFG of~\eqref{eq:probssm} over the horizon. Since future outputs are not measured, ``goal prior'' factors terminate the output edges and bias the inference towards trajectories, and thereby towards inputs, that realise the goal. We encode the target of Section~\ref{sec:problem} as the Gaussian goal prior $p(y \given \phi_*) = \cN(y \given y_*, S_*)$.
+Fig.~\ref{fig:ffg} shows the FFG of~\eqref{eq:probssm} over the horizon. Since future outputs are not measured, ``goal prior'' factors terminate the output edges and bias the inference towards trajectories, and thereby towards inputs, that realize the goal. We encode the target of Section~\ref{sec:problem} as the Gaussian goal prior $p(y \given \phi_*) = \cN(y \given y_*, S_*)$.
 
 \begin{figure}[t]
 	\centering
 	\input{graphs/graph-ssm}
 	\caption{FFG of the planning model~\eqref{eq:probssm}, whose nodes are $f_t = p(x_t)$, $f_\theta = p(\theta)$, $f_u = p(u_k)$, $f_x = p(x_k \given x_{k-1}, \theta, u_k)$, $f_y = p(y_k \given x_k)$ and $f_* = p(y_k \given \phi_*)$. Equality nodes ($=$) enforce consistency \citep{loeliger2007factor}. On the edge $u_{t+1}$, the node $f_u$ sends \protect\wcircled{1}${}= p(u_{t+1})$, and $f_x$ sends \protect\wcircled{2}${}= \nu(u_{t+1})$, computed from messages on its other edges.}
 	\label{fig:ffg}
+	\vspace{-15pt}
 \end{figure}
 
-The controller infers the belief of the next input $u_{t+1}$ by message passing, with a forward sweep to the end of the horizon and a backward sweep in return (see Sec.~\ref{sec:message_passing}). The two messages on an edge multiply to its belief, as Fig.~\ref{fig:ffg} shows for $u_{t+1}$. However, exact inference in~\eqref{eq:probssm} does not yield a dual controller. It treats the goal priors as observations, so it moves the parameter belief towards parameters under which the goal is easy to reach, an issue known as ``optimism'' in control as inference~\citep{levine2018reinforcement}. Moreover, the exact posterior does not reward inputs that reveal $\theta$. Section~\ref{sec:cbfe} constrains the inference towards dual control.
+The controller infers the belief of the next input $u_{t+1}$ by message passing, with a forward sweep to the end of the horizon and a backward sweep in return (Section~\ref{sec:message_passing}). The two messages on an edge multiply to its belief, as Fig.~\ref{fig:ffg} shows for $u_{t+1}$. However, exact inference in~\eqref{eq:probssm} does not yield a dual controller. It treats the goal priors as observations, so it moves the parameter belief towards parameters under which the goal is easy to reach, an issue known as ``optimism'' in control as inference~\citep{levine2018reinforcement}. Moreover, the exact posterior does not reward inputs that reveal $\theta$. Section~\ref{sec:cbfe} constrains the inference towards dual control.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Inference}\label{sec:cbfe}
@@ -172,14 +175,13 @@ where the beliefs $q_a$ and $q_i$ are the distributions of the node $a$ and the 
 Under these local constraints, the stationary points of $\mathcal{B}$ are the fixed points of belief propagation \citep{heskes2002stable}. Additional constraints yield other message passing algorithms~\citep{yedidia2005constructing}. We employ factorization and form constraints.
 
 \begin{definition}[Factorization constraints]\label{def:factorization}
-The belief $q_a$ equals the factor $f_a$ times the edge beliefs $q_i$ on its input edges,
+Let $\mathrm{in}(a)$ be the set of input edges of node $a$. The belief $q_a$ equals the factor $f_a$ times the edge beliefs $q_i$ on its input edges,
 \begin{equation}\label{eq:factorization}
-	q_a(s_a) = f_a(s_a) \prod_{i \in \mathrm{in}(a)} q_i(s_i) \, ,
+	q_a(s_a) = f_a(s_a) \prod_{i \in \mathrm{in}(a)} q_i(s_i) \, .
 \end{equation}
-where $\mathrm{in}(a)$ is the set of input edges of node $a$.
 \end{definition}
 %This structured mean-field factorization approximates the posterior but keeps every factor intact~\citep{csenoz2021variational}.
-
+%
 \begin{definition}[Form constraints]\label{def:form}
 The belief $q_b$ is pinned to the form of the factor $f_b$,
 \begin{equation}\label{eq:form}
@@ -187,17 +189,17 @@ The belief $q_b$ is pinned to the form of the factor $f_b$,
 \end{equation}
 \end{definition}
 %
-We assume a separate Bayesian filtering procedure produces posterior distributions for the current state $x_t$ and the parameters $\theta$. In the planning model, the marginal beliefs over these are pinned to the posteriors $q(\theta) = p(\theta \given y_{1:t}, u_{1:t})$ and $q(x_t) = p(x_t \given y_{1:t}, u_{1:t})$, so that the goal priors cannot cause optimism. We assume the transition $f(\cdot)$ and measurement $g(\cdot)$ functions are known so the corresponding beliefs are form constrained as well.
+We assume a separate Bayesian filtering procedure produces posterior distributions for the current state $x_t$ and the parameters $\theta$. In the planning model, the marginal beliefs over these are form constrained to the posteriors $q(\theta) = p(\theta \given y_{1:t}, u_{1:t})$ and $q(x_t) = p(x_t \given y_{1:t}, u_{1:t})$, so that the goal priors cannot cause optimism. The transition and measurement functions $f$ and $g$ are known, so the factorization constraints~\eqref{eq:factorization} keep their factors in the node beliefs.
 
 %The information gain from outputs to parameters, given controls is:
 %\begin{equation} \label{eq:mutual_info}
 %	\mathbb{I}[y_t, \theta \given u_t] = \int q(y_t, \theta \given u_t) \ln \frac{q(y_t, \theta \given u_t)}{q(y_t \given u_t) q(\theta)} \mathrm{d}\theta \, .
 %\end{equation}
 
-We shall impose information gain constraints as well.
-Recall that the information gain between the variables $a_1$ and $a_2$ given a third variable $a_3$ under a belief $q_a$ \citep{cover1999elements},
+We propose to add information gain constraints.
+Recall that the information gain between the variables $a_1$ and $a_2$ given a third variable $a_3$ under a belief $q_a$ is~\citep{cover1999elements}
 \begin{equation}\label{eq:mutual_info}
-	\mathbb{I}_a[a_1 : a_2 \given a_3] = \int q_a(a_1, a_2 \given a_3) \ln \frac{q_a(a_1, a_2 \given a_3)}{q(a_1 \given a_3) q(a_2)} \mathrm{d}(a_1,a_2) \, .
+	\mathbb{I}_a[a_1 : a_2 \given a_3] = \int q_a(a_1, a_2 \given a_3) \ln \frac{q_a(a_1, a_2 \given a_3)}{q(a_1 \given a_3)\, q(a_2 \given a_3)} \mathrm{d}(a_1,a_2) \, .
 \end{equation}
 %
 For the state-space model, we constrain the information $\mathbb{I}_{t+1}[y_{t+1} : x_{t+1}, \theta \given u_{t+1}]$ that the next output carries about the unknown state and parameters, given the next input. It follows from the joint belief of the measurement and transition nodes,
@@ -207,18 +209,20 @@ For the state-space model, we constrain the information $\mathbb{I}_{t+1}[y_{t+1
 \end{equation}
 
 \begin{definition}[Information gain constraints] \label{def:info}
-The information gain between two variables in belief $q_a$ given a third, has to exceed a lower bound  $\beta$:
+The information gain between two variables in belief $q_a$ given a third has to exceed a lower bound $\beta$:
 \begin{equation} \label{eq:info-constraint}
 	\mathbb{I}_{a}[a_1 : a_2 \given a_3] \geq \beta \, .
 \end{equation}
 \end{definition}
-
+%
 %An information gain constraint will bias the inference procedure to control posteriors $q(u_{t+1})$ that will lead to states and parameters with better output predictions. The floor is important, as a too small floor leads to no noticeable effect and a too large floor leads to ignoring the goal. A key feature of the current formulation is that $\beta$ need not be treated as a tuneable hyperparameter. We set it to be excess uncertainty of the predictions with respect to the goal prior:
 %\begin{equation}
 %	\beta_t = \mathbb{E}_{p(u_t)} \Big[ \mathbb{H} \big[ q(y_t \given u_t) \big] \Big] - \mathbb{H}\big[ p(y_{t} \given \phi_*) \big] \, .
 %\end{equation}
 %The second term on the right is the entropy of the goal prior, indicating how much uncertainty there may still be if the controller reachers the target. The first term on the right-hand side is the conditional entropy of the output predictive distribution, averaged over the prior belief over controls. If the predictive distribution is precise, then, on average, controls will have low entropy. If its imprecise, entropy will be high. That means that when $\beta_t$ is positive, the predictive uncertainty exceeds the allowed level of uncertainty and actions must be taken to reduce uncertainty in the future.
-The constraint biases the control posterior $q(u_{t+1})$ towards informative inputs, and its lower bound $\beta$, the information floor, sets the strength of this bias. A low floor has no effect, whereas a high floor overrides the goal, so we derive the floor from the goal instead of tuning it. Since the goal tolerates the spread $S_*$ around the target, no information is needed while the predictions stay within this tolerance. Let $\mu(u)$ and $\Sigma(u)$ be the mean and covariance of the predictive distribution $q(y_{t+1} \given u_{t+1} = u)$. The covariance matters only at inputs that reach the goal, so we weight every input by its prior probability and by the goal likelihood of its mean prediction,
+The constraint biases the control posterior $q(u_{t+1})$ towards informative inputs, and $\beta$, the information floor, sets the strength of this bias. A low floor has no effect, whereas a high floor overrides the goal, so we derive the floor from the goal. 
+%We tolerate some spread $S_*$ around the target $y_*$, no information is needed while the predictions stay within this tolerance. 
+Let $\mu(u)$ and $\Sigma(u)$ be the mean and covariance of the predictive distribution $q(y_{t+1} \given u_{t+1} = u)$. The covariance matters only at controls that reach the goal, so we weight every control by its prior probability and by the goal likelihood of its mean prediction,
 \begin{equation}\label{eq:goal-weights}
 	\tilde{p}_t(u) \propto p(u)\, \cN\big(\mu(u) \given y_*, S_*\big) \, , \qquad \bar{\Sigma}_{t+1} = \E_{\tilde{p}_t}\big[\Sigma(u)\big] \, .
 \end{equation}
@@ -240,7 +244,7 @@ The Bethe free energy~\eqref{eq:bethe} of the model~\eqref{eq:probssm} reduces, 
 	\mathcal{B}[q] = \sum_{k\in\tau} D_{\text{KL}} \big[q(u_k) \,\|\, p(u_k) \big] - \E_{q(y_k)} \big[ \ln p(y_k \given \phi_*) \big]  .
 \end{equation}
 \end{lemma}
-The proof is in Appendix~\ref{appx:bethe_collapse}. Since~\eqref{eq:collapse} agrees with~\eqref{eq:bethe} on the constraint set, the two share their constrained stationary points. The form constraints fix $q(x_t)$ and $q(\theta)$, and the node beliefs~\eqref{eq:factorization} meet the marginalization at their input edges, because the transition and measurement factors are normalised conditional densities. Only the normalisation of the control beliefs and the marginalization at the outputs of the transition and measurement nodes remain. With multipliers $\psi_k$, $\lambda_{y_k}$ and $\lambda_{x_k}$ for these constraints and $\gamma \geq 0$ for the information gain constraint, the constrained Bethe Lagrangian is
+The proof is in Appendix~\ref{appx:bethe_collapse}. Since~\eqref{eq:collapse} agrees with~\eqref{eq:bethe} on the constraint set, the two share their constrained stationary points. The form constraints fix $q(x_t)$ and $q(\theta)$, and the node beliefs~\eqref{eq:factorization} meet the marginalization at their input edges, because the transition and measurement factors are normalized conditional densities. Only the normalization of the control beliefs and the marginalization at the outputs of the transition and measurement nodes remain. With multipliers $\psi_k$, $\lambda_{y_k}$ and $\lambda_{x_k}$ for these constraints and $\gamma \geq 0$ for the information gain constraint, the constrained Bethe Lagrangian is
 \begin{align}
 	\mathcal{L}[q] &= \mathcal{B}[q] + \gamma \Big( \beta_t - \mathbb{I}_{t+1}\big[y_{t+1} : x_{t+1}, \theta \given u_{t+1}\big] \Big) \label{eq:lagrangian} \\
 	&\quad + \sum_{k \in \tau} \Big( \psi_k \big( \int q(u_k)\, \rmd u_k - 1 \big)   + \int \lambda_{y_k}(y_k) \big( q(y_k) - \int p(y_k \given x_k)\, q(x_k)\, \rmd x_k \big) \rmd y_k  \nonumber \\
@@ -257,11 +261,10 @@ At the stationary point of~\eqref{eq:lagrangian}, every input $u_k$ has the beli
 where $q(y_m \given u_k)$ is the prediction of $y_m$ that the marginalization constraints propagate from the input value $u_k$ and the beliefs of the other inputs. The information gain $\mathbb{I}_{t+1}(u_{t+1})$ at the input value $u_{t+1}$ has the weight $\gamma_{t+1} = \gamma$, and $\gamma_k = 0$ for later inputs.
 \end{theorem}
 The proof is in Appendix~\ref{appx:stationary}.
-In words, the approximate posterior is a product of the control prior times a pseudo-likelihood, consisting of the exponentiated cross-entropy between predictions and goals, and the potential information gained on states and parameters from predicted future observations. The cross-entropy term for a Gaussian goal prior and a prediction of $y_k$ with mean $\mu_k$ and covariance $\Sigma_k$ is
-\begin{equation}\label{eq:cross-entropy}
-	\E[\ln p(y_k \given \phi_*)] = -\tfrac{1}{2}\|\mu_k \tm y_*\|^2_{S_*^{-1}} - \tfrac{1}{2}\tr\big(S_*^{-1}\Sigma_k\big) + \mathrm{const} \, ,
-\end{equation}
-whose two terms are the tracking and caution terms of dual control~\citep{barshalom1974dual}. The information gain term consists of the information $\mathbb{I}_{t+1}(u_{t+1})$ that the next output carries about the next state and the parameters at the input value $u_{t+1}$, weighted by the multiplier $\gamma$, and it adds probing. For $\gamma = 0$, the mode of $q^\star$ is a cautious controller. A fixed weight on the information gain of every step gives an explicit dual MPC, and with weight one, outputs that determine the state and point-mass state beliefs, the stationary points coincide with those of EFE minimisation~\citep{van2022active}. The KKT conditions of the information gain constraint select the multiplier $\gamma$. For the posterior~\eqref{eq:posterior}, they read
+In words, the approximate posterior is the control prior times a pseudo-likelihood, consisting of the exponentiated cross-entropy between predictions and goals, and the potential information gained on states and parameters from predicted future observations. The cross-entropy term for a Gaussian goal prior and a prediction of $y_k$ with mean $\mu_k$ and covariance $\Sigma_k$ is $\E[\ln p(y_k \given \phi_*)] = -\tfrac{1}{2}\|\mu_k \tm y_*\|^2_{S_*^{-1}} - \tfrac{1}{2}\tr\big(S_*^{-1}\Sigma_k\big) + \mathrm{constants}$. These two terms are the tracking and caution terms of dual control~\citep{barshalom1974dual}. 
+%The information gain term consists of the information $\mathbb{I}_{t+1}(u_{t+1})$ that the next output carries about the next state and the parameters at the input value $u_{t+1}$, weighted by the multiplier $\gamma$, and it adds probing. 
+%
+For $\gamma = 0$, the mode of $q^\star$ is a cautious controller. A fixed weight on the information gain of every step gives an explicit dual MPC. With weight one, the stationary points coincide with those of expected free energy minimization~\citep{kouw2026expected}. Instead of tuning, we solve for $\gamma$ by meeting the KKT conditions of the information gain constraint. For the posterior~\eqref{eq:posterior}, they read
 \begin{equation}\label{eq:kkt}
 	\gamma \geq 0 \, , \quad \mathbb{I}_{t+1}[q^\star] \geq \beta_t \, , \quad \gamma \big(\beta_t - \mathbb{I}_{t+1}[q^\star]\big) = 0 \, ,
 \end{equation}
@@ -269,7 +272,7 @@ which are dual feasibility, primal feasibility and complementary slackness. The 
 \begin{equation}\label{eq:expected-info}
 	h(\gamma) = \mathbb{I}_{t+1}[q^\star] = \E_{q^\star(u_{t+1};\gamma)}\big[\mathbb{I}_{t+1}(u_{t+1})\big] \, .
 \end{equation}
-A larger multiplier tilts the posterior towards informative inputs, so $h$ grows with $\gamma$. However, $h$ cannot exceed the information gain of the most informative inputs that the posterior can select. The posterior contains the prior factor $p(u_{t+1})$ and thus ignores inputs of zero prior probability, so this bound is the essential supremum of the information gain under the prior,
+A larger multiplier tilts the posterior towards informative inputs, so $h$ grows with $\gamma$. However, $h$ cannot exceed the information gain of the most informative inputs that the posterior can select. The posterior contains the prior factor $p(u_{t+1})$ and thus ignores inputs of zero prior probability. The bound is the essential supremum of the information gain under the prior,
 \begin{equation}\label{eq:ess-sup}
 	\mathbb{I}^{\max} = \operatorname*{ess\,sup}_{u \sim p} \mathbb{I}_{t+1}(u) = \min\Big\{ c : \Pr_{u \sim p}\big[\mathbb{I}_{t+1}(u) > c\big] = 0 \Big\} \, ,
 \end{equation}
@@ -284,9 +287,9 @@ and no solution if $\beta_t \geq \mathbb{I}^{\max}$.
 \end{lemma}
 The proof is in Appendix~\ref{appx:info_multiplier}. If the posterior for $\gamma = 0$ already meets the floor, the controller does not probe. Otherwise, the multiplier is the probing weight at which the posterior meets the floor exactly, so a higher floor demands a larger weight.
 %
-In all examples, the floor lies below $\mathbb{I}^{\max}$, if necessary by capping it just below, so the multiplier is finite.
+%In all examples, the floor lies below $\mathbb{I}^{\max}$, if necessary by capping it just below, so the multiplier is finite.
 
-The planner solves the constraint on the first input of the plan, which it replans for every trial multiplier. Since this information gain is nondecreasing in $\gamma$, the planner brackets the smallest multiplier that meets the floor by quadrupling a trial multiplier from one, and then applies regula falsi. The floor averages over 4096 inputs drawn uniformly from $\cU$.
+%The planner solves the constraint on the first input of the plan, which it replans for every trial multiplier. Since this information gain is nondecreasing in $\gamma$, the planner brackets the smallest multiplier that meets the floor by quadrupling a trial multiplier from one, and then applies regula falsi. 
 
 \subsection{Message passing} \label{sec:message_passing}
 Message passing computes the posterior~\eqref{eq:posterior} by sweeps over the FFG of Fig.~\ref{fig:ffg}, each with a forward pass that predicts the outputs and a backward pass that scores them against the goal. From the form-constrained beliefs \wcircled{3}${}= q(x_t)$ and \wcircled{4}${}= q(\theta)$, every conditional node sends the marginal of its belief~\eqref{eq:factorization} forward, such as the predicted state \wcircled{5} and output \wcircled{7}, as in the prediction steps of the Kalman filter~\citep{loeliger2007factor}. The backward pass starts from the goal priors, such as \wcircled{8}${}= p(y_{t+1} \given \phi_*)$, and every conditional node $c$ sends to its input edge $j$ the exponentiated expectation of the log-messages on its outputs,
@@ -295,7 +298,7 @@ Message passing computes the posterior~\eqref{eq:posterior} by sweeps over the F
 \end{equation}
 where $q_c(s_c \given s_j)$ is the belief~\eqref{eq:factorization} with $s_j$ fixed and $d_l$ is the node that consumes the output $l$. The equality node of $x_{t+1}$ multiplies the messages from the measurement node and the next transition node into \wcircled{6}, from which the transition node computes \wcircled{2}. Averaging log-messages, instead of messages as in belief propagation, gives the backup of control as inference with fixed dynamics, which avoids optimism~\citep{levine2018reinforcement}. For linear Gaussian nodes, every backward message carries a quadratic cost-to-go, as in LQ control on factor graphs~\citep{hoffmann2017linear}.
 
-Since every slice repeats the nodes of the first, the messages \wcircled{9}--\wcircled{14} at $t+2$ and \wcircled{15}--\wcircled{20} at $t+K$, drawn lighter in Fig.~\ref{fig:ffg}, have the functional forms of \wcircled{3}--\wcircled{8}, in order, except that \wcircled{18} lacks a message from a next transition node. The backward pass updates every control belief to the product of the messages on its edge, such as \wcircled{1} and \wcircled{2}, and the constraint adds $e^{\gamma\, \mathbb{I}_{t+1}(u)}$ on the edge of $u_{t+1}$. For a fixed multiplier, every update minimises $\mathcal{L}$ over one control belief, so the sweeps decrease $\mathcal{L}$ monotonically. The planner linearises the transition nodes at their incoming means and keeps every control belief at its mode. As these coordinate updates converge linearly, the experiments find the same fixed point by quasi-Newton steps (Section~S3.3 of the supplementary material).
+Since every slice repeats the nodes of the first, the messages \wcircled{9}--\wcircled{14} at $t+2$ and \wcircled{15}--\wcircled{20} at $t+K$, drawn lighter in Fig.~\ref{fig:ffg}, have the functional forms of \wcircled{3}--\wcircled{8}, in order, except that \wcircled{18} lacks a message from a next transition node. The backward pass updates every control belief to the product of the messages on its edge, such as \wcircled{1} and \wcircled{2}, and the constraint adds $e^{\gamma\, \mathbb{I}_{t+1}(u)}$ on the edge of $u_{t+1}$. For a fixed multiplier, every update minimizes $\mathcal{L}$ over one control belief, so the sweeps decrease $\mathcal{L}$ monotonically. The planner linearizes the transition nodes at their incoming means and keeps every control belief at its mode. As these coordinate updates converge linearly, the experiments find the same fixed point by quasi-Newton steps (Section~S2.3 of the supplementary material).
 
 %Our planner represents every control belief by its mode, and it passes point masses at the predicted means forward and Gaussian messages in information form backward~\citep{loeliger2007factor}. It thereby minimises the negative log-posterior of the plan $u_\tau = (u_{t+1}, \dots, u_{t+K})$,
 %\begin{equation}\label{eq:joint}
@@ -307,11 +310,12 @@ Since every slice repeats the nodes of the first, the messages \wcircled{9}--\wc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Experiments}\label{sec:experiments}
 
-We perform experiments with navigating while identifying unknown parameters\footnote{Code: \url{https://github.com/biaslab/L4DC2027-InfoConstraints}}. To control for model flexibility, all controllers in a comparison share the model and the filter, and the predictive controllers have the same horizon length $K$. Experiments are repeated over $100$ seeds. 
+We perform experiments on systems with unknown parameters\footnote{Code: \url{https://github.com/biaslab/L4DC2027-InfoConstraints}}. To control for model flexibility, all controllers in a comparison share the model and the filter, and the predictive controllers have the same horizon length $K$. 
+%Experiments are repeated over $100$ seeds. 
 %Since all controllers share the seeds, we give paired bootstrap 95\% intervals of the differences.
 
 \paragraph{Baselines}
-The proposed controller is called \emph{info-CBFE}. Removing its information gain constraint gives the ablation \emph{no-info-CBFE}, which keeps the caution of the trace term in~\eqref{eq:cross-entropy} but never probes. As state-of-the-art methods, we compare to \emph{dual MPC}, which minimises $-\ln q^{\star}(u_k)$ for each $k \in \tau$ with the fixed weight $\gamma_k = \rho/2$. It comprises the goal tracking, caution and probing terms of explicit dual control~\citep{mesbah2018stochastic,heirung2017dual}, and differs from info-CBFE only in how it weighs the information. \emph{MPC-X} minimises a nominal goal tracking cost subject to the experiment-design constraint of~\citet{larsson2013model}. This constraint demands enough information that, with probability 0.95, the estimation error raises the goal cost by at most $1/\kappa$, so the required information grows with the accuracy $\kappa$. We tune $\rho$ and $\kappa$ on held-out seeds at the nominal sensor noise.
+The proposed controller is called \emph{info-CBFE}, and the ablation without the information gain constraint is called \emph{no-info-CBFE}. As state-of-the-art methods, we compare to \emph{dual MPC}, which minimizes $-\ln q^{\star}(u_k)$ for each $k \in \tau$ with the fixed weight $\gamma_k = \rho/2$. It comprises the goal tracking, caution and probing terms of explicit dual control~\citep{mesbah2018stochastic,heirung2017dual}, and differs from info-CBFE only in how it weighs the information. \emph{MPC-X} minimizes a nominal goal tracking cost subject to the experiment-design constraint of~\citet{larsson2013model}. This constraint demands enough information that, with probability 0.95, the estimation error raises the goal cost by at most $1/\kappa$, so the required information grows with the accuracy $\kappa$. We tune $\rho$ and $\kappa$ on held-out seeds at the nominal sensor noise.
 
 \begin{figure*}[t]
 	\centering
@@ -320,34 +324,63 @@ The proposed controller is called \emph{info-CBFE}. Removing its information gai
 	\includegraphics[width=0.24\textwidth]{fig_ablation_cumulative_noise_fresh}\hfill
 	\includegraphics[width=0.24\textwidth]{fig_ablation_cumulative_wallclock_fresh}\hfill
 	\includegraphics[width=0.24\textwidth]{fig_ablation_activity_fresh}
-	\caption{At $\sigma_f = 2$~m/s$^2$, the untuned info-CBFE costs as little as the dual MPC tuned at this noise and less than no-info-CBFE and MPC-X. Ribbons show one standard error over 99 flights, and the dashed line shows an oracle that knows the wind and the fault. (a) Performance (Eq.~\ref{eq:metric}) accumulated over the flight at $\sigma_f = 2$~m/s$^2$. (b) Performance against IMU noise (vertical line indicates $\sigma_f$ for (a) and (c)). (c) Performance against per-step wall-clock time. (d) Per-step wall-clock time of info-CBFE versus the proportion of constraint activations, with a least-squares regression (black).}
+	\caption{At $\sigma_f = 2$~m/s$^2$, the untuned info-CBFE costs as little as the dual MPC tuned at this noise and less than no-info-CBFE and MPC-X. Ribbons show one standard error over 99 flights, and the dashed line shows an oracle that knows the wind and the fault. (a) Performance~\eqref{eq:metric} accumulated over the flight at $\sigma_f = 2$~m/s$^2$. (b) Performance against IMU noise (vertical line indicates $\sigma_f$ for (a) and (c)). (c) Performance against per-step wall-clock time. (d) Per-step wall-clock time of info-CBFE versus the proportion of constraint activations, with a least-squares regression (black).}
 	\label{fig:quad}
+	\vspace{-15pt}
 \end{figure*}
 
-\paragraph{System specification}\label{sec:quadcopter}
+\subsection{Integrator with unknown gain}\label{sec:astrom}
+
+The benchmark of \citet{aastrom1986dual} consists of $x_k = x_{k-1} + b\, u_k + w_k$ and $y_k = x_k$ that has to be driven to zero over $T = 50$ steps from $x_0 = 0$.
+The noise is zero-mean Gaussian distributed, $w_k \sim \cN(0, \sigma^2)$, and the gain is unknown, $\theta = b \sim \cN(b_0, 1)$. 
+%The input determines how much the next state reveals about the gain, and under $b_0 = 0$ the unknown sign of the gain turns a cautious controller off. 
+The parameter belief is the Kalman filter $\cN(\hat{b}_t, P_t)$, so the gain adds the variance $P_t u^2$ to the prediction. The information of the transition node is $\tfrac{1}{2}\ln(1 + \ell_t(u))$ with $\ell_t(u) = P_t u^2/\sigma^2$. With the goal prior $\cN(0, \sigma^2)$, the floor is $\beta_t = \tfrac{1}{2}\ln\big((\sigma^2 + P_t\, \E_{\tilde{p}_t}[u^2]) / (2\sigma^2)\big)$. 
+We set $\sigma = 0.1$ and run 200 episodes for each prior mean $b_0 \in \{0, 0.5, 1, 2, 4\}$, with $b$ drawn from its prior. 
+Tuning on 50 held-out episodes per prior mean selects $\rho = 5$ from $\{0, 0.5, 1, 2, 5, 10, 20, 50\}$ and $\kappa = 0.1$ for MPC-X from $\{0.01, 0.03, 0.1, 0.3, 1\}$. The optimal dual controller follows from dynamic programming on a $121 \times 121$ grid without an input bound. All other controllers keep $u_k \in \cU = [-1, 1]$ (Section~S2.6 of the supplementary material).
+
+\paragraph{Results}
+Without tuning, info-CBFE comes within 12\% of the dual MPC with the best probing weight at every prior mean. Over all prior means, it attains $G = 1.41$, against 1.34 for the dual MPC with the tuned $\rho = 5$, 1.35 for MPC-X and 1.04 for the optimal dual controller, which has no input bound. The paired differences to the dual MPC and MPC-X are 0.069 [0.005, 0.155] and 0.058 [$-0.020$, 0.158]. Outside $5 \leq \rho \leq 10$, the dual MPC exceeds the $G$ of info-CBFE by at least 17\% at some prior mean (Fig.~\ref{fig:integrator} left). With $\rho \leq 2$, it applies no input under $b_0 = 0$, where its $G$ is 12.8, and $\rho = 50$ over-probes, which raises its $G$ by 22\% over all prior means.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=0.45\textwidth]{fig_integrator_sensitivity}
+	\includegraphics[width=0.4\textwidth]{fig_integrator_constraint}
+	\caption{(Left) $G$ of the dual MPC relative to that of info-CBFE against its probing weight $\rho$, per prior mean $b_0$ over 200 episodes. 
+%	Only $\rho = 5$ and $\rho = 10$ keep the dual MPC within 6\% of CBFE under every prior mean, because smaller weights leave it idle under $b_0 = 0$ and larger weights over-probe. 
+	The blue line marks info-CBFE, which needs no tuning, and the diamond marks twice the median of its active multipliers. (Right) Proportion of episodes, per prior mean $b_0$, in which the information constraint of info-CBFE is active. The constraint acts only in the first steps.}
+	\label{fig:integrator}
+	\vspace{-15pt}
+\end{figure}
+
+The multiplier probes only while the gain is too uncertain for the goal (Fig.~\ref{fig:integrator} right). Its constraint is active on 2.0\% of the steps, at the first step of every episode for $b_0 \leq 0.5$ and never for $b_0 = 4$. The active multipliers have a median of 3.2, which corresponds to $\rho = 6.4$, inside the window of good weights. Without the constraint, no-info-CBFE applies no input under $b_0 = 0$, because every input only spreads the prediction while the sign of the gain is unknown.
+
+%\paragraph{System specification}
+\subsection{Quadcopter navigation under a faulty compass heading} \label{sec:quadcopter}
 
 Consider a quadcopter with state $x_k = (p_k, \dot p_k, f_k)$, for position, velocity and force, and control space $\mathcal{U} = [-1, 1]^3$ that has to navigate to a target $5$~m away and $1$~m higher within $S_* = (0.03~\mathrm{m})^2 I$. The trial is $T = 20$ steps with step size $\Delta = 0.5$~s, and the controllers run a horizon of length $K = 6$. Its equations of motion are \citep{mahony2012multirotor},
 \begin{equation}\label{eq:quad}
 \begin{aligned}
-	f_k &= \alpha_k \begin{bmatrix} \Gamma\, n^{\mathrm{h}}_k \\ \eta\, n^{\mathrm{v}}_k \end{bmatrix} + \alpha_k \Pi_k \big( c_k - k\, \dot p_{k-1} \big) + w_k \, , \qquad \Gamma = \begin{bmatrix} a & -b \\ b & a \end{bmatrix} , \\
+	f_k &= \alpha_k \begin{bmatrix} \Gamma\, n^{\mathrm{h}}_k \\ \eta\, n^{\mathrm{v}}_k \end{bmatrix} + \alpha_k \Pi_k \big( c_k - d\, \dot p_{k-1} \big) + w_k \, , \qquad \Gamma = \begin{bmatrix} a & -b \\ b & a \end{bmatrix} , \\
 	\dot p_k &= \dot p_{k-1} + \Delta\, (f_k - g e_3) \, , \qquad p_k = p_{k-1} + \Delta\, \dot p_{k-1} + \tfrac{1}{2}\Delta^2 (f_k - g e_3) \, ,
 \end{aligned}
 \end{equation}
 where $\alpha_k = g\,(1 + u_{k,1}/2)$ is the thrust per mass, $n_k = (\cos\varphi \sin\vartheta, -\sin\varphi, \cos\varphi\cos\vartheta)$ the thrust axis for the roll $\varphi = 0.4\, u_{k,2}$ and the pitch $\vartheta = 0.4\, u_{k,3}$, $n^{\mathrm{h}}_k$ and $n^{\mathrm{v}}_k$ its horizontal and vertical parts, and $\Pi_k = I - n_k n_k^\top$ the projection onto the rotor plane. A position fix and an IMU measure $y_k = (p_k + v^{\mathrm{p}}_k, f_k + v^{\mathrm{f}}_k)$ with $v^{\mathrm{p}}_k \sim \cN(0, 0.3^2 I)$ and $v^{\mathrm{f}}_k \sim \cN(0, \sigma_f^2 I)$, and $w_k \sim \cN(0, 0.2^2 I)$ collects unmodelled forces.
 
-The controller learns the parameters $\theta = (c_k, k, a, b, \eta)$, which all enter~\eqref{eq:quad} linearly. Magnetic interference rotates its heading by an unknown angle $\chi \sim \mathcal{U}[-2.6, 2.6]$~rad so that $(a, b) = (\cos\chi, \sin\chi)$ \citep{kok2016magnetometer}. Rotor drag grows with the thrust and with the airspeed in the rotor plane~\citep{martin2010true,kai2017nonlinear,faessler2017differential}, so $k$ scales the drag of its own velocity and $c_k = k\,\omega_k$ the drag of the wind $\omega_k$, whose Weibull-distributed mean speed~\citep{justus1978methods} and direction fluctuate with correlation times of 1 to 10~s. The prior on $(a, b)$ matches the moments of the fault distribution, because only a prior that states the uncertainty lets the floor see it, and an extended Kalman filter tracks $x_k$ and $\theta$ and models $c_k$ and the gains as random walks. The constraint and its floor~\eqref{eq:floor} use the position output, on which the goal acts. 
+The controller learns the parameters $\theta = (c_k, d, a, b, \eta)$, which all enter~\eqref{eq:quad} linearly. Magnetic interference rotates its heading by an unknown angle $\chi \sim \mathcal{U}[-2.6, 2.6]$~rad so that $(a, b) = (\cos\chi, \sin\chi)$ \citep{kok2016magnetometer}. Rotor drag grows with the thrust and with the airspeed in the rotor plane~\citep{martin2010true,kai2017nonlinear,faessler2017differential}, so $d$ scales the drag of its own velocity and $c_k = d\,\omega_k$ the drag of the wind $\omega_k$, whose Weibull-distributed mean speed~\citep{justus1978methods} and direction fluctuate with correlation times of 1 to 10~s. The prior on $(a, b)$ matches the moments of the fault distribution. An extended Kalman filter tracks $x_k$ and $\theta$, and $c_k$ and the gains are modelled as random walks. 
+%The constraint and its floor~\eqref{eq:floor} use the position output. 
+When computing the information floor $\beta_t$, we average over 4096 inputs drawn uniformly from $\cU$.
 
 \paragraph{Results}
-From 1.5~s on, info-CBFE has accumulated the least cost, and it costs less than MPC-X at every IMU noise (Fig.~\ref{fig:quad}(a) and~(b)). Since the seeds 1000--1099 informed the design of the experiment, we report the fresh seeds 4000--4099 (Section~S2.5 of the supplementary material). We drop seed 4076, on which even an oracle that knows the wind and the fault ends farther from the target than it started. At the nominal noise $\sigma_f = 2$~m/s$^2$, info-CBFE attains $G = 3230$, against 3363 for the dual MPC, 3857 for MPC-X and 3922 for no-info-CBFE, with paired gaps of 133 [$-312$, 582], 626 [332, 1000] and 692 [195, 1184]. Info-CBFE thus matches the tuned dual MPC and cuts the learning cost, the cost above that of the oracle, by 24\% against MPC-X and 26\% against no-info-CBFE. The intervals of the differences to the dual MPC include zero at every noise, and those to no-info-CBFE up to $\sigma_f = 1$~m/s$^2$.
+From 1.5~s on, info-CBFE has accumulated the least cost, and it costs less than MPC-X at every IMU noise (Fig.~\ref{fig:quad}(a) and~(b)). Since the seeds 1000--1099 informed the design, we report the fresh seeds 4000--4099 (Section~S2.5 of the supplementary material). We drop seed 4076, on which even an oracle that knows the wind and the fault ends farther from the target than it started. At $\sigma_f = 2$~m/s$^2$, info-CBFE attains $G = 3230$, against 3363 for the dual MPC, 3857 for MPC-X and 3922 for no-info-CBFE, with paired gaps of 133 [$-312$, 582], 626 [332, 1000] and 692 [195, 1184]. Info-CBFE thus matches the tuned dual MPC at every noise and cuts the learning cost, the cost above that of the oracle, by 24\% against MPC-X and 26\% against no-info-CBFE. No-info-CBFE ties with info-CBFE only up to $\sigma_f = 1$~m/s$^2$.
 %
-The constraint triggers when no-info-CBFE is over-cautious, and it turns this caution into exploration. While the rotation is unknown, every tilt spreads the predicted position, so the trace term holds the first tilt of no-info-CBFE at $7^\circ$, whereas the goal-reaching inputs tilt fully. The constraint is active in the first step of every flight and in the second step of 96\%. It raises the first tilt of info-CBFE to $30^\circ$, so that the first measurements reveal the rotation, and it acts again on 26\% of the later steps. No-info-CBFE therefore accrues 674 [266, 1087] of its gap to info-CBFE within the first 4~s (Fig.~\ref{fig:quad}(a)).
+The constraint turns the caution of no-info-CBFE into exploration. While the rotation is unknown, every tilt spreads the predicted position, so the trace term holds the first tilt of no-info-CBFE at $7^\circ$. The constraint is active at the first step of every flight and the second of 96\%. It raises the first tilt of info-CBFE to $30^\circ$, so that the first measurements reveal the rotation, and acts again on 26\% of the later steps. No-info-CBFE therefore accrues 674 [266, 1087] of its gap to info-CBFE within the first 4~s (Fig.~\ref{fig:quad}(a)).
 %
-Pure exploitation is not cautious enough and produces occasional bad flights. The requirement of MPC-X changes the plan on only 0.05\% of the test steps, so MPC-X flies its nominal plan, tilts by $31^\circ$ from the first step and keeps acting on its point estimate while noisy measurements correct it. Its median cost therefore lies 13\% above that of info-CBFE, whereas its worst 10\% of flights cost 36\% more. These flights keep adding cost after info-CBFE levels off, so the gap of MPC-X grows from 449 [264, 663] at 4~s to 626 at 10~s (Fig.~\ref{fig:quad}(a)). Info-CBFE flies better than MPC-X in 50\% of the flights with $|\chi| < 1$~rad and in 82\% of those with $|\chi| > 2$~rad. Owing to the multiplier search, the mean time per step of info-CBFE has a median over the flights of 255~ms, against 28 to 80~ms for the other controllers, and it grows by 4~ms per percent of active steps (Fig.~\ref{fig:quad}(c) and~(d)). A step with an active constraint takes a median of 0.62~s, longer than the control period of 0.5~s.
+MPC-X, in contrast, barely probes and produces occasional bad flights. Its requirement changes the plan on only 0.05\% of the test steps, so it tilts by $31^\circ$ from the first step and acts on its point estimate while noisy measurements correct it. Its median cost lies 13\% above that of info-CBFE, whereas its worst 10\% of flights cost 36\% more. These flights keep adding cost after info-CBFE levels off, so the gap of MPC-X grows from 449 [264, 663] at 4~s to 626 at 10~s. Owing to the multiplier search, info-CBFE takes a median of 255~ms per step, against 28 to 80~ms for the other controllers, and 4~ms more per percent of active steps (Fig.~\ref{fig:quad}(c) and~(d)). An active step takes a median of 0.62~s, longer than the control period of 0.5~s.
 
 %%%%
 \section{Discussion}\label{sec:discussion}
 
-The information~\eqref{eq:info-constraint} has a closed form when the parameters enter the mean linearly with Gaussian noise, whereas nonlinear parameterisations require an approximation. Whether the floor can be attained depends on a parameter-induced covariance that is proportional to the noise covariance.
+The information~\eqref{eq:info-constraint} has a closed form when the parameters enter the mean linearly with Gaussian noise, whereas nonlinear parameterizations require an approximation. Whether the floor can be attained depends on a parameter-induced covariance that is proportional to the noise covariance.
 
 Constraining only the next node forces the information to come from one measurement, which results in greedy identification plans even though the regulation plans are non-greedy. Constraints on later nodes would spread the probing over the plan, but they require a belief that learns within the plan, as in implicit dual control~\citep{mesbah2018stochastic}. In other words, the belief $q(\theta)$ must not be form constrained, but allowed to change over the course of the plan. 
 
@@ -357,7 +390,7 @@ Closed-loop stability remains an open question as well as the consistency of the
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusion}\label{sec:conclusion}
 
-We showed that a goal-derived information constraint turns a message passing planner on a factor graph into a dual controller without a probing weight. Variational calculus yields the posterior of the next input as the product of the control prior message and a message that weighs the expected goal log-density against the information gain. The KKT multiplier of the constraint switches probing on while the uncertainty spreads the predictions beyond the goal tolerance and off once it does not. On a quadcopter with an unknown compass fault, the controller turned caution into exploration, matched a dual MPC tuned at the nominal noise and cut the learning cost by 24\% against MPC-X and by 26\% against a cautious controller. On a light--dark task, the untuned controller matched a tuned MPC-X in a precise light, whereas a dual MPC beat it only at the light noise at which we tuned its probing weight. A noisier light favoured MPC-X, because the floor demands the goal precision from the next measurement alone. Future work therefore concerns constraints on later nodes, which let several measurements share the floor but require a belief that learns within the plan.
+We showed that a goal-derived information constraint turns a message passing planner on a factor graph into a dual controller. Variational calculus yields the posterior of the next input as the product of the control prior message and a message that weighs the expected goal log-density against the information gain. The KKT multiplier of the constraint switches on when the entropy of the goal-weighted prediction exceeds that of the goal tolerance plus the output noise. On a quadcopter with an unknown compass fault, the controller matched a dual MPC tuned at the nominal noise and cut the learning cost by 24\% against MPC-X. Future work concerns stability and consistency analysis as well as further constraints.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Appendices: part of the submission, before the acknowledgments and references.
@@ -366,28 +399,28 @@ We showed that a goal-derived information constraint turns a message passing pla
 \section{Proofs}\label{app:proofs}
 
 \begin{proofof}{Lemma~\ref{lem:collapse}} \label{appx:bethe_collapse}
-The proof sums the contributions of the nodes of Fig.~\ref{fig:ffg} to~\eqref{eq:bethe}, which Table~S1 of the supplementary material lists. The form constraints pin the beliefs of $f_t$ and $f_\theta$ to their factors, so both nodes contribute zero. The factorization constraints cancel the transition and measurement factors in their log-ratios, and integrating out the outputs leaves the negative entropies of the input beliefs. The equality and goal nodes also contribute the negative entropies of their inputs. With every edge oriented from the node that generates its variable to the node that consumes it, every edge enters exactly one node, so these entropies cancel the edge entropies of~\eqref{eq:bethe}. The divergences of the control beliefs from their priors and the expected goal log-densities remain. Section~S1.1 of the supplementary material writes out every step.
+All instances of $q_a$ being equal to $f_a$ are cancelled from~\eqref{eq:bethe}. The form constraints pin $q_t$ to $f_t$ and $q_\theta$ to $f_\theta$, while the factorization constraints cancel the transition and measurement factors. The equality node beliefs ensure that the edge beliefs of the states and parameters are counted only once~\eqref{eq:bethe}. The only terms that remain are the divergences of the control beliefs from their priors and the expected goal log-densities. Section~S1.1 of the supplementary material writes out every step.
 \end{proofof}
 
 \begin{proofof}{Theorem~\ref{thm:posterior}} \label{appx:stationary}
-The proof sets the functional derivatives of the Lagrangian~\eqref{eq:lagrangian} to zero. The form constraints fix $q(x_t)$ and $q(\theta)$, so only the beliefs of the outputs, states and inputs vary, and we treat them in the order of the backward pass. An output belief $q(y_k)$ enters only the goal term of~\eqref{eq:collapse} and its own marginalization constraint, so its multiplier is the goal log-density, $\lambda_{y_k} = \ln p(y \given \phi_*)$. A state belief $q(x_k)$ enters its own constraint and the constraints of the measurement and next transition nodes, which consume $x_k$, so its multiplier collects theirs,
+The proof sets the functional derivatives of the Lagrangian~\eqref{eq:lagrangian} to zero. The form constraints fix $q(x_t)$ and $q(\theta)$, so only the beliefs of the outputs, states and inputs vary, and we treat them in the order of the backward pass. An output belief $q(y_k)$ enters only the goal term of~\eqref{eq:collapse} and its own marginalization constraint, so its multiplier is the goal log-density, $\lambda_{y_k} = \ln p(y_k \given \phi_*)$. A state belief $q(x_k)$ enters its own constraint and the constraints of the measurement and next transition nodes, which consume $x_k$, so its multiplier collects theirs,
 \begin{equation}\label{eq:state-recursion}
 	\lambda_{x_k}(x_k) = \E_{p(y_k \given x_k)}\big[\lambda_{y_k}(y_k)\big] + \E_{q_{k+1}(s_{k+1} \given x_k)}\big[\lambda_{x_{k+1}}(x_{k+1})\big] \, ,
 \end{equation}
-where $q_{k+1}(s_{k+1} \given x_k) = p(x_{k+1} \given x_k, \theta, u_{k+1})\, q(\theta)\, q(u_{k+1})$ is the next transition belief at a fixed $x_k$, and the second term vanishes for $k = t+K$. With $\nu_{d_l \to l} = \exp(\lambda_l)$, this recursion is the backward pass~\eqref{eq:message}. Unrolling it turns $\lambda_{x_k}(x_k)$ into the summed expected goal log-densities of the outputs $y_k, \dots, y_{t+K}$ given $x_k$. Finally, an input belief $q(u_k)$ enters its divergence from the prior, its normalization, the constraint of the state $x_k$ that it drives and, for $k = t+1$, the information gain, which is linear in $q(u_{t+1})$. Setting its derivative to zero gives the Gibbs form~\eqref{eq:posterior} of control as inference~\citep{levine2018reinforcement,wainwright2008graphical}. Section~S1.2 of the supplementary material writes out every derivative.
+where $q_{k+1}(s_{k+1} \given x_k) = p(x_{k+1} \given x_k, \theta, u_{k+1})\, q(\theta)\, q(u_{k+1})$ is the next transition belief at a fixed $x_k$, and the second term vanishes for $k = t+K$. With the message $\nu_{d_l \to l} = \exp(\lambda_l)$, this recursion is the backward pass~\eqref{eq:message}. Unrolling it turns $\lambda_{x_k}(x_k)$ into the summed expected goal log-densities of the outputs $y_\tau$ given $x_k$. Finally, an input belief $q(u_k)$ enters its divergence from the prior, its normalization, the constraint of the state $x_k$ that it drives and, for $k = t+1$, the information gain, which is linear in $q(u_{t+1})$. Setting its derivative to zero gives the Gibbs form~\eqref{eq:posterior} of control as inference~\citep{levine2018reinforcement,wainwright2008graphical}. Section~S1.2 of the supplementary material writes out every derivative.
 \end{proofof}
 
 \begin{proofof}{Lemma~\ref{lem:multiplier}} \label{appx:info_multiplier}
-With all other beliefs fixed, Theorem~\ref{thm:posterior} gives the posterior $q^\star(u; \gamma) = p(u)\, \nu_0(u)\, e^{\gamma \mathbb{I}_{t+1}(u)} / Z(\gamma)$ of the next input, where the message $\nu_0 > 0$ collects the expected goal log-densities and does not depend on $\gamma$, and $Z(\gamma)$ normalises. This posterior is an exponential family with the natural parameter $\gamma$ and the sufficient statistic $\mathbb{I}_{t+1}$~\citep{wainwright2008graphical}. The first derivative of its log-normaliser $\ln Z$ is therefore the mean $h(\gamma)$ of the information gain, and the second derivative is the variance $h'(\gamma)$. This variance is positive, because the information gain varies over sets of inputs with positive prior probability, which keep positive probability under the posterior. Hence $h$ is continuous and strictly increasing. As $\gamma$ grows, the factor $e^{\gamma \mathbb{I}_{t+1}}$ moves the posterior mass to the inputs whose information gain lies close to $\mathbb{I}^{\max}$, so $h(\gamma) \to \mathbb{I}^{\max}$, and strict monotonicity keeps $h(\gamma)$ below this limit.
+With all other beliefs fixed, Theorem~\ref{thm:posterior} gives the posterior $q^\star(u; \gamma) = p(u)\, \nu_0(u)\, e^{\gamma \mathbb{I}_{t+1}(u)} / Z(\gamma)$ of the next input, where the message $\nu_0 > 0$ collects the expected goal log-densities and does not depend on $\gamma$, and $Z(\gamma)$ normalizes. This posterior is an exponential family with the natural parameter $\gamma$ and the sufficient statistic $\mathbb{I}_{t+1}$~\citep{wainwright2008graphical}. The first derivative of its log-normalizer $\ln Z$ is therefore the mean $h(\gamma)$ of the information gain, and the second derivative is the variance $h'(\gamma)$. This variance is positive, because the information gain varies over sets of inputs with positive prior probability, which keep positive probability under the posterior. Hence $h$ is continuous and strictly increasing. As $\gamma$ grows, the factor $e^{\gamma \mathbb{I}_{t+1}}$ moves the posterior mass to the inputs whose information gain lies close to $\mathbb{I}^{\max}$, so $h(\gamma) \to \mathbb{I}^{\max}$, and strict monotonicity keeps $h(\gamma)$ below this limit.
 
 The cases follow from the KKT conditions~\eqref{eq:kkt} with the constraint value~\eqref{eq:expected-info}. If $\beta_t \leq h(0)$, then $\gamma = 0$ meets them, and every $\gamma > 0$ violates complementary slackness, because $h(\gamma) > \beta_t$. Otherwise, $\gamma = 0$ violates the floor, so $\gamma > 0$ and complementary slackness requires $h(\gamma) = \beta_t$. For $\beta_t < \mathbb{I}^{\max}$, the intermediate value theorem and the monotonicity of $h$ give exactly one root, whereas for $\beta_t \geq \mathbb{I}^{\max}$, no root exists, because $h < \mathbb{I}^{\max}$. Section~S1.3 of the supplementary material gives the rigorous proof, including the bounds behind the derivatives and the limit.
 \end{proofof}
 
 \acks{Supported by the Sectorplan Engineering of the Ministry of Education, Science and Culture (NL).}
 
-\subsection*{Generative Artificial Intelligence Use}
+\subsection*{Generative artificial intelligence use}
 
-Generative Artificial Intelligence (AI) was used to assist with proving theorems, programming experiments and results figures. The output has been checked by the author. AI assisted with initial drafts of paragraphs, but almost all text has been rewritten by the author.
+Generative artificial intelligence (AI) was used to assist with proving theorems, programming experiments and results figures. The output has been checked by the author, who takes responsibility for its correctness. AI assisted with initial drafting, but most text has been rewritten by the author.
 
 \bibliography{references}
 
