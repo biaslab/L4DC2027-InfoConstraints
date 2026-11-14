@@ -197,8 +197,18 @@ def activity(runs: pd.DataFrame, path: Path) -> None:
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--fresh", action="store_true",
+                        help="draw only panel (d) of main.tex, from the fresh seeds without the seeds on which "
+                             "the oracle fails (paper_data.py), as fig_ablation_activity_fresh.pdf")
     S.apply()
     FIGURES.mkdir(parents=True, exist_ok=True)
+    if parser.parse_args().fresh:
+        import paper_data as D
+        runs = pd.read_csv(A.RESULTS / "runs_fresh.csv")
+        activity(runs[runs.seed.isin(D.seeds(fresh=True))], FIGURES / "fig_ablation_activity_fresh.pdf")
+        return
     episodes = A.load(A.DATA / "episodes.pkl")
     runs = pd.read_csv(A.RESULTS / "runs.csv")
     legend(FIGURES / "fig_ablation_legend.pdf")

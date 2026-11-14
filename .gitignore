@@ -42,7 +42,8 @@ experiment-drift/data/
 experiment-computation/results/
 experiment-computation/data/
 *__pycache__/
-
+.claude/
+reviews/
 
 # latex
 *.aux

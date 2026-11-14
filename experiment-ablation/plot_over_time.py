@@ -25,9 +25,15 @@ nominal IMU noise of the other panels with a dashed vertical line. The oracle
 knows the wind and the fault.
 
     python experiment-ablation/plot_over_time.py
+    python experiment-ablation/plot_over_time.py --fresh   # the panels of main.tex
+
+With ``--fresh``, the panels show the fresh seeds 4000-4099 without the seeds
+on which the oracle fails (``paper_data.py``), and their file names end in
+"_fresh".
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -39,6 +45,7 @@ import pickle  # noqa: E402
 import numpy as np  # noqa: E402
 
 import ablation as A  # noqa: E402
+import paper_data as D  # noqa: E402
 import paper_style as S  # noqa: E402
 import plot as P  # noqa: E402
 import plot_by_fault as B  # noqa: E402
@@ -53,12 +60,15 @@ YLIM = (0, 6750)                                          # shared by G over tim
 YTICKS = [0, 2000, 4000, 6000]
 STEPS = A.Benchmark().T
 YLABEL = r"$G$ ($10^3$)"
+FRESH = False     # set by --fresh: the flights of paper_data.flights()
 
 
 def metric() -> dict:
     """Per-step terms of G, eq. (metric) of main.tex, by (label, noise, seed),
     for the flights of ``run.py`` and the tuned baselines of ``run_baselines.py``,
     which record the prediction error of their filter."""
+    if FRESH:
+        return D.terms(flights())
     with open(A.DATA / "free_energy.pkl", "rb") as f:
         error = {(t["label"], t["imu_noise"], t["seed"]): 0.5 * t["error"] for t in pickle.load(f)}
     out = {(r["label"], r["imu_noise"], r["seed"]): r["true_cost"] + error[(r["label"], r["imu_noise"], r["seed"])]
@@ -70,6 +80,8 @@ def metric() -> dict:
 
 def flights() -> list:
     """Every flight of ``run.py`` and of the tuned baselines."""
+    if FRESH:
+        return D.flights(fresh=True)
     return A.load(A.DATA / "episodes.pkl") + A.load(A.DATA / "baselines_test.pkl")
 
 
@@ -185,13 +197,20 @@ def arrival(path: Path) -> None:
 
 
 def main():
+    global FRESH
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--fresh", action="store_true", help="the fresh seeds without the seeds on which the oracle fails")
+    FRESH = parser.parse_args().fresh
+    tag = "_fresh" if FRESH else ""
+    if FRESH:
+        R.SEEDS = D.seeds(fresh=True)        # plot_total.stack and arrival() read the seeds from run.py
     S.apply()
     total = metric()
     legend(P.FIGURES / "fig_ablation_legend_oracle.pdf")
-    cumulative(total, P.FIGURES / "fig_ablation_cumulative.pdf")
-    noise_sweep(total, P.FIGURES / "fig_ablation_cumulative_noise.pdf")
-    wallclock(total, P.FIGURES / "fig_ablation_cumulative_wallclock.pdf")
-    arrival(P.FIGURES / "fig_ablation_arrival.pdf")
+    cumulative(total, P.FIGURES / f"fig_ablation_cumulative{tag}.pdf")
+    noise_sweep(total, P.FIGURES / f"fig_ablation_cumulative_noise{tag}.pdf")
+    wallclock(total, P.FIGURES / f"fig_ablation_cumulative_wallclock{tag}.pdf")
+    arrival(P.FIGURES / f"fig_ablation_arrival{tag}.pdf")
     for label in arms():
         final = T.stack(total, label, R.NOMINAL).mean(axis=1)
         print(f"{P.LABELS.get(label, 'oracle'):24s} G: {final.mean():.0f} +- {final.std(ddof=1) / np.sqrt(len(final)):.0f}")
