@@ -10,8 +10,9 @@ same seed:
                                         noise (log-log)
     figures/fig_ablation_wallclock.pdf  learning cost against the wall-clock time
                                         of every flight at the nominal IMU noise
-    figures/fig_ablation_activity.pdf   wall-clock time of every flight against its
-                                        share of steps with an active constraint
+    figures/fig_ablation_activity.pdf   wall-clock time per step of every CBFE flight
+                                        against its share of steps with an active
+                                        constraint, with a least-squares line
 
 Lines carry a ribbon of one standard error of the paired difference to the
 oracle over the flights. The colour encodes the information constraint (blue
@@ -43,12 +44,18 @@ FIGURES = HERE / "figures"
 BLUE, AMBER = S.AGENTS["kkt"]["color"], S.AGENTS["gamma0"]["color"]
 DASH = (0, (3, 1.5))
 GREEN = S.AGENTS["ce"]["color"]
+# no-info-CBFE is magenta, because the amber of the cautious controller lies
+# within 14 OKLab units of the orange of the dual MPC under normal vision
+MAGENTA, ORANGE, TEAL = "#b5179e", S.AGENTS["dual"]["color"], S.AGENTS["mpcx"]["color"]
 STYLES = {
     "CBFE": dict(color=BLUE, ls="-", marker="o", mfc=BLUE, lw=1.8, zorder=6),
-    "no constraint": dict(color=AMBER, ls="-", marker="v", mfc=AMBER, lw=1.2, zorder=5),
+    "no constraint": dict(color=MAGENTA, ls="-", marker="v", mfc=MAGENTA, lw=1.2, zorder=5),
     "certainty equivalence": dict(color=GREEN, ls="-", marker="P", mfc=GREEN, lw=1.2, zorder=5),
+    "dual MPC": dict(color=ORANGE, ls="-", marker="s", mfc=ORANGE, lw=1.2, zorder=5),
+    "MPC-X": dict(color=TEAL, ls="-", marker="D", mfc=TEAL, lw=1.2, zorder=5),
 }
-LABELS = {"CBFE": "CBFE", "no constraint": "cautious (no constraint)", "certainty equivalence": "MPC"}
+LABELS = {"CBFE": "info-CBFE", "no constraint": "no-info-CBFE", "certainty equivalence": "MPC",
+          "dual MPC": "dual MPC", "MPC-X": "MPC-X"}
 ARMS = ["CBFE", "no constraint", "certainty equivalence"]
 ORACLE = A.REFERENCE
 WIDTH, HEIGHT = 0.24 * S.PMLR_TEXT_WIDTH, 1.3                                    # [in]
@@ -167,18 +174,25 @@ def wallclock(runs: pd.DataFrame, path: Path) -> None:
 
 
 def activity(runs: pd.DataFrame, path: Path) -> None:
-    """(d) Wall-clock time of every flight against its share of active steps."""
+    """(d) Wall-clock time per step of every CBFE flight against its share of
+    active steps, with the least-squares line of the time on the share."""
     fig, ax = panel(WIDTH)
-    nominal = runs[(runs.imu_noise == R.NOMINAL) & runs.timed]
-    for label in ["no constraint", "certainty equivalence", "CBFE"]:
-        sel = nominal[nominal.label == label]
-        scatter(ax, 100.0 * sel.active_steps / A.Benchmark().T, sel.wall, label)
-    ax.set_yscale("log")
-    ticks(ax.yaxis, [0.3, 1, 3, 10])
+    steps = A.Benchmark().T
+    nominal = runs[(runs.imu_noise == R.NOMINAL) & runs.timed & (runs.label == "CBFE")]
+    share = 100.0 * nominal.active_steps.to_numpy() / steps
+    wall = 1000.0 * nominal.wall.to_numpy() / steps
+    scatter(ax, share, wall, "CBFE")
+    slope, intercept = np.polyfit(share, wall, 1)
+    grid = np.linspace(0.0, share.max() * 1.05, 100)
+    ax.plot(grid, intercept + slope * grid, color=S.INK, lw=0.9, zorder=8)
+    r2 = 1.0 - np.sum((wall - intercept - slope * share)**2) / np.sum((wall - wall.mean())**2)
+    print(f"activity fit: wall per step = {intercept:.0f} ms + {slope:.2f} ms per % active (R^2 = {r2:.2f})")
+    ax.set_ylim(100, 500)
+    ticks(ax.yaxis, [100, 200, 300, 400, 500])
     ticks(ax.xaxis, [0, 20, 40, 60])
-    ax.set_xlim(-4, 66)
+    ax.set_xlim(0, 66)
     ax.set_xlabel("active steps (%)")
-    ax.set_ylabel("wall clock [s]", labelpad=1)
+    ax.set_ylabel("wall clock [ms/step]", labelpad=1)
     S.save(fig, path)
 
 

@@ -191,11 +191,15 @@ def gain_prior(bench: Benchmark):
             np.array([max(np.cos(psi).var(), 1e-6), max(np.sin(psi).var(), 1e-6), 0.05**2]))
 
 
-def make(label: str, bench: Benchmark, target: np.ndarray, lean: Optional[np.ndarray] = None) -> Agent:
-    caution, constrained = CONTROLLERS[label]
+def make(label: str, bench: Benchmark, target: np.ndarray, lean: Optional[np.ndarray] = None,
+         spec: Optional[dict] = None) -> Agent:
+    """The agent of ``label``, or of ``spec`` (the fields of ``Config`` that
+    set the planner, for the baselines of ``run_baselines.py``)."""
+    caution, constrained = CONTROLLERS[label] if spec is None else (spec["caution"], spec["constrained"])
+    extra = {} if spec is None else {key: value for key, value in spec.items() if key not in ("caution", "constrained")}
     config = Config(dt=bench.dt, horizon=bench.K, position_noise=bench.position_noise, imu_noise=bench.imu_noise,
                     force_noise=bench.force_noise, wind_step=bench.wind_step, gain_step=bench.gain_step,
-                    goal=tuple(target), goal_std=bench.goal_std, constrained=constrained, caution=caution)
+                    goal=tuple(target), goal_std=bench.goal_std, constrained=constrained, caution=caution, **extra)
     faults = bench.heading_max > 0.0 or bench.power_rate > 0.0 or bench.buckle_prob > 0.0
     gain_mean, gain_var = gain_prior(bench) if faults else (np.array([1.0, 0.0, 1.0]), np.zeros(3))
     if lean is not None:
@@ -229,7 +233,7 @@ def run_job(job: dict) -> dict:
     position fix, and the wall-clock time counts planning and filtering."""
     bench, seed, label = job["bench"], job["seed"], job["label"]
     d = draw(bench, seed)
-    agent = make(label, bench, d["target"], d["lean"])
+    agent = make(label, bench, d["target"], d["lean"], job.get("spec"))
     T, dt = bench.T, bench.dt
     p, v = np.zeros((T + 1, 3)), np.zeros((T + 1, 3))
     p[0] = d["start"]
@@ -237,6 +241,7 @@ def run_job(job: dict) -> dict:
     multiplier, plans, seconds = np.zeros(T), np.zeros(T, int), np.zeros(T)
     estimate = np.zeros((T, 4))
     gains = np.zeros((T, 3))
+    error = np.zeros(T)
     fixes = np.zeros((T + 1, 3))
     fixes[0] = p[0] + bench.position_noise * d["position"][0]
     agent.observe(position=fixes[0])
@@ -259,6 +264,7 @@ def run_job(job: dict) -> dict:
         start = time.perf_counter()
         agent.update(u[t], fixes[t + 1], f + bench.imu_noise * d["imu"][t])
         seconds[t] += time.perf_counter() - start
+        error[t] = agent.last_error
         estimate[t] = agent.mean[NX_PARAMS]
         gains[t] = agent.mean[-3:]
     cost = np.sum((fixes[1:] - d["target"])**2, axis=1) / (2.0 * bench.goal_std**2)
@@ -267,7 +273,7 @@ def run_job(job: dict) -> dict:
                 wind=d["wind"], p=p, v=v, u=u, fixes=fixes, cost=cost, G=float(cost.mean()),
                 true_cost=true_cost, G_true=float(true_cost.mean()),
                 miss=float(np.linalg.norm(p[-1] - d["target"])), multiplier=multiplier, plans=plans,
-                seconds=seconds, wall=float(seconds.sum()), estimate=estimate, gains=gains, psi=d["psi"],
+                seconds=seconds, wall=float(seconds.sum()), estimate=estimate, gains=gains, error=error, psi=d["psi"],
                 efficiency=d["efficiency"], buckles=d["buckles"])
 
 

@@ -12,7 +12,10 @@ written to figures/:
     fig_integrator_constraint.pdf  episodes in which the information constraint
                                  of the paper's CBFE is active, per step and
                                  prior mean (main.tex, Fig. 2a)
-    legend_integrator.pdf        the legend of this row in main-extended.tex
+    fig_integrator_sensitivity.pdf  RMSE of the dual MPC relative to that of
+                                 CBFE against its probing weight, per prior
+                                 mean b0 (supplementary.tex)
+    legend_integrator.pdf       the legend of this row in main-extended.tex
 
 The legends of the figures of main.tex come from figures/paper_style.py.
 
@@ -28,7 +31,7 @@ sys.path[:0] = [str(HERE), str(HERE.parent / "figures")]
 
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-from matplotlib.ticker import NullFormatter  # noqa: E402
+from matplotlib.ticker import FixedLocator, NullFormatter, NullLocator  # noqa: E402
 
 import integrator as I  # noqa: E402
 import paper_style as S  # noqa: E402
@@ -127,6 +130,17 @@ def plot_sensitivity(results, path) -> None:
     fig, ax = S.panel(S.WIDE_PANEL_SIZE)
     beta = np.concatenate([r["episode"].beta for r in results if r["label"] == CBFE])
     S.sensitivity_axes(ax, rho_cbfe=2 * np.median(beta[beta > 0]))
+    # The panel stands alone in the supplement, so the x-axis spans this grid
+    # of weights instead of the range shared with the arm. The ratios span
+    # less than a decade, so the y-axis is linear with even ticks.
+    ax.set_xlim(0.35, 75)
+    ax.xaxis.set_major_locator(FixedLocator([1, 10]))
+    ax.set_xticklabels(["1", "10"])
+    ax.set_yscale("linear")
+    ax.set_ylim(0.85, 3.75)
+    ax.yaxis.set_major_locator(FixedLocator([1, 2, 3]))
+    ax.yaxis.set_minor_locator(NullLocator())
+    ax.set_ylabel("relative RMSE", labelpad=2)
     for color, b0 in zip(S.ORANGE_RAMP, Run.B0):
         ratio = [rmse[(Run.dual_beta_label(w), b0)] / rmse[(CBFE, b0)] for w in weights]
         ax.plot(weights, ratio, color=color, marker="s", ms=2.8, mec="white", mew=0.4, lw=1.0,

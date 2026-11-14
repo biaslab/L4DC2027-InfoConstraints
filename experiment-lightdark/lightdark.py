@@ -229,6 +229,7 @@ def make_controller(spec: dict, bench: Benchmark, goal_variance: float, states=N
     if spec["kind"] == "agent":
         config = LightDarkConfig(goal_mean=bench.target, goal_variance=goal_variance, horizon=bench.horizon,
                                  planner=spec["planner"], weight=spec.get("weight", 0.0),
+                                 accuracy=spec.get("accuracy", 1.0),
                                  task_length=bench.T if spec.get("task_floor", False) else None)
         return KnownGainAgent(config, bench.model, bench.prior_mean, bench.prior_variance)
     if spec["kind"] == "dp":

@@ -62,6 +62,37 @@ is zero if the plan at gamma = 0 meets the floor, and otherwise the smallest
 multiplier at which the first input of the plan meets it: a bracket that
 grows fourfold from 1, then regula falsi (Illinois). CasADi builds J, its
 gradient and the one-step moments, and L-BFGS-B minimises J.
+
+Planners (``planner``)
+----------------------
+"cbfe"     L-BFGS-B on J, as above.
+"message"  the same CBFE by forward and backward messages on the factor graph,
+           with every control belief at its mode (``messages.py``); the floor
+           and the multiplier search are those of "cbfe".
+
+Baselines (``planner``)
+-----------------------
+"dual"  the dual MPC: J with the fixed weight ``probing_weight`` = rho/2 on
+        the information I_k of every planned step k, without the constraint.
+"mpcx"  MPC with integrated experiment design (Larsson et al., 2013): the
+        nominal MPC (no trace term, no information term) subject to the
+        requirement that the confidence ellipsoid of theta at the end of the
+        horizon lies in the application set {theta : V_app(theta) <= 1/kappa},
+
+            P_K(u)^-1 >= kappa chi2_0.95(n_theta) / 2 * V_app'' ,
+            V_app'' = J_1^T J_1 / S_* ,
+
+        with J_1 = d p_1 / d theta, the sensitivity of the next position to
+        theta under the first input of the nominal plan, and P_K(u) the
+        parameter covariance of the filter after the planned outputs. The
+        trace of J_1 P_K J_1^T <= 2 S_* / (kappa chi2) replaces the matrix
+        inequality, so that SLSQP sees a smooth constraint. The inputs barely
+        change the parameter precision over the horizon, because the wind
+        force drifts, so no plan may meet the requirement. MPC-X then keeps
+        the nominal plan (``fallback`` "nominal"), or relaxes the requirement
+        to the most precise parameters that a plan reaches plus
+        ``floor_margin`` in the log of the trace ("relax"), as the floor of
+        CBFE is capped; the relaxed MPC-X flies away for kappa >= 0.005.
 """
 from __future__ import annotations
 
@@ -73,6 +104,7 @@ from typing import Optional, Tuple
 import casadi as ca
 import numpy as np
 from scipy.optimize import minimize
+from scipy.stats import chi2
 
 from agents.common import input_nodes
 
@@ -96,6 +128,11 @@ class Config:
     control_prior_shape  c of the Beta(c, c) control prior of every input
     constrained          False: no information constraint (gamma = 0)
     caution              False: J drops the trace term (certainty equivalence)
+    planner              "cbfe" or "message" (the flags above), "dual" or "mpcx" (module docstring)
+    probing_weight       rho/2 of the dual MPC on the information of every planned step
+    accuracy             kappa of the experiment-design requirement of MPC-X
+    fallback             MPC-X without a plan that meets the requirement: "relax" it to
+                         the most precise plan, or keep the "nominal" plan
     """
     dt: float = 0.5
     horizon: int = 6
@@ -115,6 +152,10 @@ class Config:
     root_tolerance: float = 1e-3
     floor_margin: float = 0.01
     bound_margin: float = 1e-6
+    planner: str = "cbfe"
+    probing_weight: float = 0.0
+    accuracy: float = 1.0
+    fallback: str = "nominal"
 
 
 def _step(x, theta, u, dt: float, thrust_range: float, tilt_max: float):
@@ -177,6 +218,64 @@ def functions(dt: float, horizon: int, thrust_range: float, tilt_max: float, sha
     return step, objective, moments
 
 
+@lru_cache(maxsize=8)
+def baseline_functions(dt: float, horizon: int, thrust_range: float, tilt_max: float, shape: float):
+    """CasADi functions of the baselines: the objective of the dual MPC with a
+    weight on the information of every planned step, and the parameter
+    uncertainty term of the MPC-X requirement, tr(J P_K(U) J^T), with the
+    parameter covariance P_K after the filter has conditioned on the outputs
+    of the K planned steps (their values do not change the covariance)."""
+    step, _, _ = functions(dt, horizon, thrust_range, tilt_max, shape)
+    U = ca.SX.sym("U", 3 * horizon)
+    mx, Sx = ca.SX.sym("mx", NX), ca.SX.sym("Sx", NX, NX)
+    mt, Pt = ca.SX.sym("mt", NT), ca.SX.sym("Pt", NT, NT)
+    goal, weights = ca.SX.sym("goal", 3), ca.SX.sym("weights", horizon)
+    noise = ca.SX.sym("noise", 6)
+    r_p, s_goal, q_eta, q_c, trace, q_g = (noise[i] for i in range(6))
+    lift = ca.vertcat(0.5 * dt**2 * ca.SX.eye(3), dt * ca.SX.eye(3), ca.SX.eye(3))
+    Qx = q_eta * (lift @ lift.T)
+    walk = ca.diag(ca.vertcat(q_c, q_c, q_c, 0.0, q_g, q_g, q_g))
+    cost, m, S = 0.0, mx, Sx
+    for k in range(horizon):
+        uk = U[3 * k:3 * k + 3]
+        m_next, A, B = step(m, mt, uk)
+        S = A @ S @ A.T + B @ (Pt + (k + 1) * walk) @ B.T + Qx
+        m = m_next
+        Sigma = S[0:3, 0:3] + r_p * ca.SX.eye(3)
+        error = m[0:3] - goal
+        cost += (-(shape - 1.0) * ca.sum1(ca.log(1.0 - uk**2)) + ca.dot(error, error) / (2.0 * s_goal)
+                 + trace * ca.trace(Sigma) / (2.0 * s_goal)
+                 - weights[k] * 0.5 * (ca.log(ca.det(Sigma)) - 3.0 * ca.log(r_p)))
+    dual = ca.Function("J_dual", [U, mx, Sx, mt, Pt, goal, weights, noise], [cost, ca.gradient(cost, U)])
+
+    Um = ca.MX.sym("U", 3 * horizon)
+    mean, P = ca.MX.sym("mean", NX + NT), ca.MX.sym("P", NX + NT, NX + NT)
+    J1 = ca.MX.sym("J1", 3, NT)
+    variances = ca.MX.sym("variances", 5)       # sigma_p^2, sigma_f^2, sigma_eta^2, q_c, q_gain
+    H = np.zeros((6, NX + NT))
+    H[[0, 1, 2, 3, 4, 5], [0, 1, 2, 6, 7, 8]] = 1.0
+    R = ca.diag(ca.vertcat(variances[0], variances[0], variances[0], variances[1], variances[1], variances[1]))
+    Q = ca.MX.zeros(NX + NT, NX + NT)
+    lifted = np.vstack([0.5 * dt**2 * np.eye(3), dt * np.eye(3), np.eye(3)])
+    Q[:NX, :NX] = variances[2] * (lifted @ lifted.T)
+    for i in range(3):
+        Q[NX + i, NX + i] = variances[3]
+        Q[NX + 4 + i, NX + 4 + i] = variances[4]
+    x, th, cov = mean[:NX], mean[NX:], P
+    for k in range(horizon):
+        x_next, A, B = step(x, th, Um[3 * k:3 * k + 3])
+        F = ca.blockcat([[A, B], [ca.MX.zeros(NT, NX), ca.MX.eye(NT)]])
+        cov = F @ cov @ F.T + Q
+        HP = H @ cov
+        cov = cov - HP.T @ ca.solve(HP @ H.T + R, HP)
+        cov = 0.5 * (cov + cov.T)
+        x = x_next
+    spread = ca.trace(J1 @ cov[NX:, NX:] @ J1.T)
+    requirement = ca.Function("requirement", [Um, mean, P, J1, variances],
+                              [ca.log(spread), ca.gradient(ca.log(spread), Um)])
+    return dual, requirement
+
+
 @dataclass
 class Agent:
     """Extended Kalman filter over (x, theta) and the planner of the module
@@ -196,6 +295,13 @@ class Agent:
         self._nodes = input_nodes(3)
         self._moments = moments.map(len(self._nodes))
         self._log_prior_nodes = (c.control_prior_shape - 1.0) * np.log1p(-np.square(self._nodes)).sum(axis=1)
+        if c.planner in ("dual", "mpcx"):
+            self.dual_fn, self.requirement_fn = baseline_functions(c.dt, c.horizon, c.thrust_range, c.tilt_max,
+                                                                   c.control_prior_shape)
+        if c.planner == "message":
+            from .messages import MessagePlanner      # messages.py imports this module
+            self._message = MessagePlanner(c)
+        self.last_sweeps = 0
         self.mean = np.concatenate([self.state_mean, self.parameter_mean]).astype(float)
         self.covariance = np.diag(np.concatenate([self.state_variance, self.parameter_variance])).astype(float)
         self.last_multiplier, self.last_floor, self.last_information, self.last_plans = 0.0, np.nan, np.nan, 0
@@ -221,8 +327,19 @@ class Agent:
         H = np.zeros((len(rows), NX + NT))
         H[np.arange(len(rows)), rows] = 1.0
         innovation = H @ self.covariance @ H.T + np.diag(variances)
+        residual = np.array(values) - H @ self.mean
+        # Free energy of this update: the output map is linear in (x, theta), so
+        # the Gaussian update is exact given the predicted belief, and the free
+        # energy equals -ln N(y; H m, H P H' + R), the precision-weighted
+        # prediction error plus the log-determinant of the predictive covariance.
+        root = np.linalg.cholesky(innovation)
+        white = np.linalg.solve(root, residual)
+        self.last_error = float(white @ white)
+        self.last_logdet = float(2.0 * np.sum(np.log(np.diag(root))))
+        self.last_free_energy = 0.5 * (len(rows) * math.log(2.0 * math.pi) + self.last_logdet + self.last_error)
+        self.last_residual, self.last_innovation = residual.copy(), innovation.copy()
         gain = np.linalg.solve(innovation, H @ self.covariance).T
-        self.mean = self.mean + gain @ (np.array(values) - H @ self.mean)
+        self.mean = self.mean + gain @ residual
         self.covariance = self.covariance - gain @ innovation @ gain.T
         self.covariance = 0.5 * (self.covariance + self.covariance.T)
 
@@ -278,6 +395,10 @@ class Agent:
         first input."""
         self.last_plans += 1
         c = self.config
+        if c.planner == "message":
+            plan, info = self._message.plan(multiplier, beliefs, start, self._noise())
+            self.last_sweeps = self._message.last_sweeps
+            return plan, info
         bound = 1.0 - c.bound_margin
         args = (*beliefs, np.asarray(c.goal, float), multiplier, self._noise())
 
@@ -334,13 +455,94 @@ class Agent:
                 side = -1
         return high[0], high[2], high[3]
 
+    def _solve_dual(self, beliefs, start: np.ndarray) -> np.ndarray:
+        """Plan of the dual MPC: J with the fixed weight on every step."""
+        self.last_plans += 1
+        c = self.config
+        bound = 1.0 - c.bound_margin
+        args = (*beliefs, np.asarray(c.goal, float), np.full(c.horizon, c.probing_weight), self._noise())
+
+        def fun(U):
+            value, grad = self.dual_fn(U, *args)
+            return float(value), np.array(grad).ravel()
+
+        best, best_value = None, np.inf
+        for initial in (np.clip(start, -bound, bound), np.zeros(3 * c.horizon)):
+            result = minimize(fun, initial, jac=True, method="L-BFGS-B", bounds=[(-bound, bound)] * len(initial),
+                              options={"ftol": 1e-12, "gtol": 1e-8, "maxiter": 300})
+            if result.fun < best_value:
+                best, best_value = result.x, float(result.fun)
+        return best
+
+    def _solve_mpcx(self, beliefs, start: np.ndarray) -> Tuple[np.ndarray, bool]:
+        """Plan of MPC-X and whether its requirement is active."""
+        c = self.config
+        bound = 1.0 - c.bound_margin
+        nominal, _ = self._solve(0.0, beliefs, start)
+        _, _, B = (np.array(v) for v in self.step(self.mean[:NX], self.mean[NX:], nominal[:3]))
+        J1 = B[0:3, :]
+        variances = np.array([c.position_noise**2, c.imu_noise**2, c.force_noise**2, c.wind_step**2,
+                              c.gain_step**2])
+        required = math.log(2.0 * c.goal_std**2 / (c.accuracy * chi2.ppf(0.95, NT)))
+        args = (self.mean, self.covariance, J1, variances)
+
+        def margin(U):
+            return required - float(self.requirement_fn(U, *args)[0])
+
+        def margin_jac(U):
+            return -np.array(self.requirement_fn(U, *args)[1]).ravel()
+
+        if margin(nominal) >= 0.0:
+            return nominal, False
+        cost_args = (*beliefs, np.asarray(c.goal, float), 0.0, self._noise())
+
+        def cost(U):
+            value, grad, _ = self.objective_fn(U, *cost_args)
+            return float(value), np.array(grad).ravel()
+
+        def constrained(starts, slack: float):
+            best = None
+            for initial in starts:
+                self.last_plans += 1
+                result = minimize(cost, np.clip(initial, -bound, bound), jac=True, method="SLSQP",
+                                  bounds=[(-bound, bound)] * len(initial),
+                                  constraints=[{"type": "ineq", "fun": lambda U: margin(U) + slack,
+                                                "jac": margin_jac}],
+                                  options={"maxiter": 200, "ftol": 1e-10})
+                if margin(result.x) + slack >= -1e-6 and (best is None or result.fun < best.fun):
+                    best = result
+            return best
+
+        best = constrained((start, nominal), 0.0)
+        if best is not None:
+            return best.x, True
+        if c.fallback == "nominal":
+            return nominal, False
+        self.last_plans += 1
+        least = minimize(lambda U: (-margin(U), -margin_jac(U)), nominal, jac=True, method="L-BFGS-B",
+                         bounds=[(-bound, bound)] * len(nominal), options={"maxiter": 300})
+        best = constrained((least.x, nominal), -margin(least.x) + c.floor_margin)
+        return (least.x if best is None else best.x), True
+
     def plan(self) -> np.ndarray:
         """The next input: the first input of the mode of the plan."""
         c = self.config
         beliefs = self.beliefs()
         self.last_plans = 0
+        if c.planner == "message":
+            self._message.last_sweeps = 0
         start = (np.zeros(3 * c.horizon) if self._previous_plan is None
                  else np.concatenate([self._previous_plan[3:], self._previous_plan[-3:]]))
+        if c.planner == "dual":
+            plan = self._solve_dual(beliefs, start)
+            self.last_floor, self.last_multiplier, self.last_information = np.nan, c.probing_weight, np.nan
+            self._previous_plan = plan
+            return plan[:3].copy()
+        if c.planner == "mpcx":
+            plan, active = self._solve_mpcx(beliefs, start)
+            self.last_floor, self.last_multiplier, self.last_information = np.nan, float(active), np.nan
+            self._previous_plan = plan
+            return plan[:3].copy()
         if c.constrained:
             floor, _ = self.floor(beliefs)
             multiplier, plan, info = self._multiplier(beliefs, floor, start)

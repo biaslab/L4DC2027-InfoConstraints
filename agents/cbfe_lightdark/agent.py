@@ -59,6 +59,8 @@ from scipy.optimize import minimize
 
 from agents.common import input_nodes
 
+CHI2_95 = 3.841458820694124     # chi-square quantile of one degree of freedom at 0.95
+
 
 @dataclass(frozen=True)
 class LightDarkModel:
@@ -112,6 +114,10 @@ class GridFilter:
         shifted = np.interp(self.x - control_input, self.x, self.p, left=0.0, right=0.0)
         predicted = np.convolve(shifted, self.kernel, mode="same")
         r = self.model.noise(self.x)
+        # moments of the one-step predictive distribution of the output
+        weights = predicted / predicted.sum()
+        self.last_output_mean = float(weights @ self.x)
+        self.last_output_variance = float(weights @ (self.x - self.last_output_mean)**2 + weights @ r)
         log_likelihood = -0.5 * ((output - self.x)**2 / r + np.log(r))
         posterior = predicted * np.exp(log_likelihood - log_likelihood.max())
         total = posterior.sum()
@@ -131,7 +137,11 @@ class LightDarkConfig:
 
     planner   "cbfe" (KKT multiplier on the state information of the next
               step), "dual" (fixed ``weight`` on every step), "bsp"
-              (belief-space planning), or "none" (no information term)
+              (belief-space planning), "mpcx" (nominal MPC with an
+              experiment-design constraint, see ``_solve_mpcx``), or "none"
+              (no information term)
+    accuracy  gamma of MPC-X: the state precision predicted at the end of the
+              horizon must reach gamma chi2_0.95(1) / (2 S_*)
     """
     goal_mean: float = 0.0
     goal_variance: float = 0.01
@@ -146,6 +156,7 @@ class LightDarkConfig:
     task_length: Optional[int] = None
     max_sweeps: int = 60
     sweep_tolerance: float = 1e-10
+    accuracy: float = 1.0
 
 
 @dataclass
@@ -286,6 +297,56 @@ class LightDarkAgent:
                 best = result
         return best.x, float(best.fun)
 
+    def nominal_cost(self, plan: np.ndarray, m: float) -> float:
+        """Tracking cost of the mean predictions and the control prior."""
+        c = self.config
+        means = m + np.cumsum(plan)
+        return float(np.sum(-(c.control_prior_shape - 1.0) * np.log1p(-np.square(plan))
+                            + np.square(means - c.goal_mean) / (2.0 * c.goal_variance)))
+
+    def end_variance(self, plan: np.ndarray, m: float, V: float) -> float:
+        """State variance at the end of the horizon after the planned
+        measurements, with the noise at the predicted means."""
+        variance, mean = V, m
+        for u in plan:
+            mean += float(u)
+            prior = variance + self.model.q
+            r = float(self.model.noise(mean))
+            variance = prior * r / (prior + r)
+        return variance
+
+    def _solve_mpcx(self, m: float, V: float, start: Optional[np.ndarray]) -> Tuple[np.ndarray, bool]:
+        """MPC with integrated experiment design (Larsson et al., 2013) for the
+        hidden state: the nominal MPC subject to a state precision of at least
+        gamma chi2_0.95(1) / (2 S_*) at the end of the horizon. Without a
+        ramp over the experiment, because the state drifts and its information
+        does not accumulate. If no plan meets the requirement, the plan with
+        the largest precision stands."""
+        c = self.config
+        K = c.horizon
+        bound = 1.0 - c.bound_margin
+        required = math.log(c.goal_variance / (c.accuracy * CHI2_95 / 2.0))
+        plan, _ = self._solve(np.zeros(K), m, V, start)
+        if math.log(self.end_variance(plan, m, V)) <= required:
+            return plan, False
+        towards, mean = np.zeros(K), m
+        for k in range(K):
+            towards[k] = float(np.clip(self.model.light + 0.2 - mean, -0.9, 0.9))
+            mean += towards[k]
+        margin = {"type": "ineq", "fun": lambda u: required - math.log(self.end_variance(u, m, V))}
+        best = None
+        for initial in (towards, plan):
+            result = minimize(self.nominal_cost, np.clip(initial, -bound, bound), args=(m,), method="SLSQP",
+                              bounds=[(-bound, bound)] * K, constraints=[margin],
+                              options={"maxiter": 200, "ftol": 1e-10})
+            if margin["fun"](result.x) >= -1e-6 and (best is None or result.fun < best.fun):
+                best = result
+        if best is not None:
+            return best.x, True
+        result = minimize(lambda u: math.log(self.end_variance(u, m, V)), np.clip(towards, -bound, bound),
+                          method="L-BFGS-B", bounds=[(-bound, bound)] * K)
+        return result.x, True
+
     def floor(self, m: float, V: float) -> float:
         """1/2 ln(A / S_*), with A = V + (T - t) q the spread by the end of the
         task (A = V + q without ``task_length``), capped at the information of
@@ -351,6 +412,9 @@ class LightDarkAgent:
         self.last_multiplier, self.last_floor = 0.0, 0.0
         if c.planner == "bsp":
             plan, _ = self._solve_bsp(m, V, warm)
+        elif c.planner == "mpcx":
+            plan, active = self._solve_mpcx(m, V, warm)
+            self.last_multiplier = 1.0 if active else 0.0
         elif c.planner == "dual":
             plan, _ = self._solve(np.full(K, c.weight), m, V, warm)
         else:

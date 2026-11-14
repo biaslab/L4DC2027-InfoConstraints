@@ -8,7 +8,8 @@ against the entropy of the predictive Student-t), the KKT regimes of the
 information multiplier, the objective and the optimum of the message
 planner, the gradient and the optimum of the gradient planner, and closed
 loops on a scalar integrator. The remaining checks run
-the shared utilities, the dual MPC, MPC-X, PILCO and, when torch is
+the shared utilities, the dual MPC, MPC-X, PILCO, the light-dark agent, the
+message planner of the quadcopter against L-BFGS-B and, when torch is
 available, TD-MPC2.
 
     python agents/test_agents.py
@@ -936,6 +937,34 @@ def test_lightdark_planner_and_floor():
                          for s in (np.zeros(5), np.array([0.9, 0, 0, 0, 0]))), key=lambda r: r.fun)
         assert value <= reference.fun + 1e-6
     assert agent.floor(0.0, 0.005) < 0.0 < agent.floor(0.0, 0.25)
+
+
+def test_quadcopter_message_planner_reaches_the_gradient_minimum():
+    """The hard-coded messages of agents/cbfe_quad/messages.py: the free energy
+    of the forward messages equals the objective J of the gradient planner,
+    and the coordinate updates reach the minimum of J that a long L-BFGS-B
+    run finds, without and with a multiplier on the next information."""
+    from scipy.optimize import minimize
+    from agents.cbfe_quad.agent import Agent as QuadAgent, Config as QuadConfig, GRAVITY
+    config = QuadConfig(goal=(3.0, 2.0, 1.0), goal_std=0.05, position_noise=0.3, imu_noise=1.0, planner="message")
+    agent = QuadAgent(config, state_mean=np.r_[np.zeros(6), 0.0, 0.0, GRAVITY],
+                      state_variance=np.r_[[0.09] * 3, [0.0025] * 3, [1.0] * 3],
+                      parameter_mean=np.array([0.1, -0.05, 0.0, 0.04, 0.2, 0.5, 1.0]),
+                      parameter_variance=np.array([0.02, 0.02, 3e-4, 1e-4, 0.4, 0.6, 0.0025]))
+    beliefs, noise, goal = agent.beliefs(), agent._noise(), np.asarray(config.goal, float)
+    planner, start = agent._message, np.zeros(3 * config.horizon)
+    for multiplier in (0.0, 1e3):
+        plan, _ = planner.plan(multiplier, beliefs, start, noise)
+
+        def J(U, multiplier=multiplier):
+            value, gradient, _ = agent.objective_fn(U, *beliefs, goal, multiplier, noise)
+            return float(value), np.array(gradient).ravel()
+        means, covs = planner.forward_pass(plan, beliefs)
+        assert np.isclose(planner.free_energy(plan, means, covs, multiplier)[0], J(plan)[0], rtol=1e-12)
+        reference = minimize(J, start, jac=True, method="L-BFGS-B", bounds=[(-1 + 1e-6, 1 - 1e-6)] * len(start),
+                             options={"ftol": 1e-15, "gtol": 1e-10, "maxiter": 20000})
+        assert J(plan)[0] <= reference.fun + 1e-9 * (1 + abs(reference.fun)), (J(plan)[0], reference.fun)
+        assert np.allclose(plan, reference.x, atol=1e-4), np.max(np.abs(plan - reference.x))
 
 
 def main() -> int:
